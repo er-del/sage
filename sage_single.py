@@ -175,7 +175,16 @@ class CausalSelfAttention(nn.Module):
             new_kv = None
         q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
         is_causal = kv_cache is None and T > 1
-        y = F.scaled_dot_product_attention(q, k, v, dropout_p=0.0 if not self.training else 0.1, is_causal=is_causal)
+        try:
+            y = F.scaled_dot_product_attention(q, k, v, dropout_p=0.0 if not self.training else 0.1, is_causal=is_causal)
+        except Exception:
+            attn = (q @ k.transpose(-2, -1)) * (self.head_dim ** -0.5)
+            if is_causal:
+                mask = torch.tril(torch.ones(T, T, device=q.device)).view(1, 1, T, T)
+                attn = attn.masked_fill(mask == 0, float('-inf'))
+            attn = F.softmax(attn, dim=-1)
+            if self.training: attn = F.dropout(attn, p=0.1)
+            y = attn @ v
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         return self.resid_dropout(self.wo(y)), new_kv
 

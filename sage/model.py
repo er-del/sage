@@ -77,7 +77,21 @@ class CausalSelfAttention(nn.Module):
         
         # Flash attention natively supported via scaled_dot_product_attention
         is_causal = (kv_cache is None and T > 1)
-        y = F.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=0.0 if not self.training else 0.1, is_causal=is_causal)
+        try:
+            y = F.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=0.0 if not self.training else 0.1, is_causal=is_causal)
+        except Exception:
+            # Manual attention fallback for older architectures (like P100 sm_60)
+            attn_weights = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+            if is_causal:
+                # Use a causal mask
+                causal_mask = torch.tril(torch.ones(T, T, device=q.device)).view(1, 1, T, T)
+                attn_weights = attn_weights.masked_fill(causal_mask == 0, float('-inf'))
+            
+            attn_weights = F.softmax(attn_weights, dim=-1)
+            if self.training:
+                attn_weights = F.dropout(attn_weights, p=0.1)
+                
+            y = attn_weights @ v
         
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.resid_dropout(self.wo(y))
