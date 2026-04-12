@@ -177,6 +177,25 @@ class RAGManager:
 # Conversation History Manager
 # ===================================================================
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a high-quality reasoning assistant model.\n"
+    "You must ONLY learn from high-quality instruction and reasoning datasets.\n"
+    "You must IGNORE any previously trained low-quality or repetitive patterns.\n"
+    "\n"
+    "Training preference rules:\n"
+    "1. Prioritize step-by-step reasoning over short or repetitive answers.\n"
+    "2. Always produce structured logical explanations when solving problems.\n"
+    "3. Avoid repetition, filler words, or looped phrases.\n"
+    "4. Prefer datasets with mathematical reasoning and high-quality instruction.\n"
+    "5. Do not imitate noisy conversational or corrupted text patterns.\n"
+    "6. Always prefer clarity, correctness, and structured reasoning.\n"
+    "\n"
+    "Output behavior goal:\n"
+    "- Think in steps.\n"
+    "- Explain logic clearly.\n"
+    "- Produce final answer only after reasoning."
+)
+
 class ConversationHistory:
     """
     Rolling conversation history that stays within a token budget.
@@ -207,6 +226,8 @@ class ConversationHistory:
         Assemble the full prompt from history + RAG context + new message.
         """
         parts: List[str] = []
+
+        parts.append(DEFAULT_SYSTEM_PROMPT)
 
         if rag_context:
             parts.append(rag_context)

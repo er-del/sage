@@ -593,6 +593,23 @@ class RAGManager:
 
     def toggle(self, on): self.enabled = on
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a high-quality reasoning assistant model.\n"
+    "You must ONLY learn from high-quality instruction and reasoning datasets.\n"
+    "You must IGNORE any previously trained low-quality or repetitive patterns.\n\n"
+    "Training preference rules:\n"
+    "1. Prioritize step-by-step reasoning over short or repetitive answers.\n"
+    "2. Always produce structured logical explanations when solving problems.\n"
+    "3. Avoid repetition, filler words, or looped phrases.\n"
+    "4. Prefer datasets with mathematical reasoning and high-quality instruction.\n"
+    "5. Do not imitate noisy conversational or corrupted text patterns.\n"
+    "6. Always prefer clarity, correctness, and structured reasoning.\n\n"
+    "Output behavior goal:\n"
+    "- Think in steps.\n"
+    "- Explain logic clearly.\n"
+    "- Produce final answer only after reasoning."
+)
+
 class ConversationHistory:
     def __init__(self, tokenizer, max_tokens=900):
         self.tokenizer, self.max_tokens, self.turns = tokenizer, max_tokens, []
@@ -603,11 +620,12 @@ class ConversationHistory:
             self.turns.pop(0)
 
     def build_prompt(self, msg, rag_ctx=""):
-        parts = [rag_ctx] if rag_ctx else []
+        parts = [DEFAULT_SYSTEM_PROMPT]
+        if rag_ctx: parts.append(rag_ctx)
         for t in self.turns:
             parts.append(f"{'User' if t['role']=='user' else 'SAGE'}: {t['text']}")
         parts += [f"User: {msg}", "SAGE:"]
-        return "\n".join(parts)
+        return "\n\n".join(parts)
 
     def clear(self): self.turns.clear()
 
