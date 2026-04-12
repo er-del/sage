@@ -22,8 +22,8 @@ class SageConfig:
     dropout: float = 0.1
     
     # Training Loop defaults
-    batch_size: int = 16
-    gradient_accumulation_steps: int = 4
+    batch_size: int = 4
+    gradient_accumulation_steps: int = 16
     learning_rate: float = 3e-4
     min_learning_rate: float = 1e-5
     warmup_steps: int = 100

@@ -49,8 +49,8 @@ class SageConfig:
     vocab_size: int = 100277
     max_seq_len: int = 1024
     dropout: float = 0.1
-    batch_size: int = 16
-    gradient_accumulation_steps: int = 4
+    batch_size: int = 4
+    gradient_accumulation_steps: int = 16
     learning_rate: float = 3e-4
     min_learning_rate: float = 1e-5
     warmup_steps: int = 100
@@ -254,7 +254,14 @@ class SageModel(nn.Module):
         new_kvs = []
         for i, layer in enumerate(self.layers):
             kv = kv_caches[i] if kv_caches else None
-            x, nkv = layer(x, fc, kv)
+            if self.training and kv is None:
+                def create_custom_forward(module):
+                    def custom_forward(x_in, freqs_cis_in):
+                        return module(x_in, freqs_cis_in, None)
+                    return custom_forward
+                x, nkv = torch.utils.checkpoint.checkpoint(create_custom_forward(layer), x, fc, use_reentrant=False)
+            else:
+                x, nkv = layer(x, fc, kv)
             if nkv is not None: new_kvs.append(nkv)
         return self.lm_head(self.ln_f(x)), new_kvs if new_kvs else None
 

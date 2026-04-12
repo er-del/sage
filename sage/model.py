@@ -208,7 +208,22 @@ class SageModel(nn.Module):
         new_kv_caches = []
         for i, layer in enumerate(self.layers):
             kv_cache = kv_caches[i] if kv_caches else None
-            x, new_kv_cache = layer(x, freqs_cis, kv_cache)
+            
+            # Use gradient checkpointing during training
+            if self.training and kv_cache is None:
+                def create_custom_forward(module):
+                    def custom_forward(x_in, freqs_cis_in):
+                        return module(x_in, freqs_cis_in, None)
+                    return custom_forward
+                
+                x, new_kv_cache = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(layer), 
+                    x, freqs_cis, 
+                    use_reentrant=False
+                )
+            else:
+                x, new_kv_cache = layer(x, freqs_cis, kv_cache)
+                
             if new_kv_cache is not None:
                 new_kv_caches.append(new_kv_cache)
                 
