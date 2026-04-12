@@ -127,13 +127,17 @@ def train(
 
     # Wrap model with torch.compile for graph-level optimization
     if hasattr(torch, "compile"):
-        logger.info("Turbo Mode: Compiling model graph...")
-        base = getattr(model, "module", model)
-        compiled_base = torch.compile(base, mode="reduce-overhead")
-        if hasattr(model, "module"):
-            model.module = compiled_base
-        else:
-            model = compiled_base
+        try:
+            logger.info("Turbo Mode: Compiling model graph...")
+            base = getattr(model, "module", model)
+            compiled_base = torch.compile(base, mode="reduce-overhead")
+            if hasattr(model, "module"):
+                model.module = compiled_base
+            else:
+                model = compiled_base
+        except (ValueError, RuntimeError, ImportError) as e:
+            # Graceful fallback: numpy compatibility issues or other compilation errors
+            logger.warning(f"torch.compile failed ({type(e).__name__}), proceeding without optimization: {str(e)[:100]}")
 
     tok = tokenizer or SageTokenizer()
     optimizer = create_optimizer(model, config)

@@ -375,14 +375,19 @@ def train_model(model, config, total_steps=500, dataset_name="roneneldan/TinySto
     # Wrap model with torch.compile for graph-level optimization
     # mode="reduce-overhead" is ideal for smaller-to-medium models like SAGE
     if hasattr(torch, "compile"):
-        logger.info("Turbo Mode: Compiling model graph...")
-        # Compile the base model (unwrapped from DataParallel if present)
-        base = getattr(model, "module", model)
-        compiled_base = torch.compile(base, mode="reduce-overhead")
-        if hasattr(model, "module"):
-            model.module = compiled_base
-        else:
-            model = compiled_base
+        try:
+            logger.info("Turbo Mode: Compiling model graph...")
+            # Compile the base model (unwrapped from DataParallel if present)
+            base = getattr(model, "module", model)
+            compiled_base = torch.compile(base, mode="reduce-overhead")
+            if hasattr(model, "module"):
+                model.module = compiled_base
+            else:
+                model = compiled_base
+        except (ValueError, RuntimeError, ImportError) as e:
+            # Graceful fallback: numpy compatibility issues or other compilation errors
+            logger.warning(f"torch.compile failed ({type(e).__name__}), proceeding without optimization: {str(e)[:100]}")
+            # Continue with uncompiled model
 
     opt = create_optimizer(model, config)
     start_step = 0
