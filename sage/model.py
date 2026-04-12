@@ -15,6 +15,10 @@ def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Te
 
 def apply_rotary_emb(xq: torch.Tensor, xk: torch.Tensor, freqs_cis: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     """Applies rotary positional embeddings to queries and keys."""
+    # Ensure freqs_cis is complex (DataParallel can sometimes replicate it as real)
+    if not torch.is_complex(freqs_cis) and freqs_cis.shape[-1] == 2:
+        freqs_cis = torch.view_as_complex(freqs_cis)
+    
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
     
