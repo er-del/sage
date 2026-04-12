@@ -115,7 +115,6 @@ class StreamingTextDataset(IterableDataset):
             self.dataset_name,
             split=self.split,
             streaming=True,
-            trust_remote_code=True,
         )
 
         for sample in ds:

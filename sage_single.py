@@ -26,7 +26,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.prune as prune
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from torch.utils.data import IterableDataset, DataLoader
 from tqdm import tqdm
 import tiktoken
@@ -280,7 +280,7 @@ class StreamingTextDataset(IterableDataset):
 
     def _tokens(self):
         from datasets import load_dataset
-        ds = load_dataset(self.dataset_name, split=self.split, streaming=True, trust_remote_code=True)
+        ds = load_dataset(self.dataset_name, split=self.split, streaming=True)
         for s in ds:
             raw = s.get(self.text_field, "")
             if not raw or len(raw) < 50: continue
@@ -338,7 +338,7 @@ def train_model(model, config, total_steps=500, dataset_name="roneneldan/TinySto
         if start_step >= total_steps: return model
     use_amp = device.type == "cuda"
     amp_dtype = torch.bfloat16 if use_amp and torch.cuda.is_bf16_supported() else torch.float16
-    scaler = GradScaler(enabled=use_amp and amp_dtype == torch.float16)
+    scaler = GradScaler("cuda", enabled=use_amp and amp_dtype == torch.float16)
     loader = create_dataloader(config, dataset_name, tok)
     data_iter = iter(loader)
     model.train()
@@ -353,7 +353,7 @@ def train_model(model, config, total_steps=500, dataset_name="roneneldan/TinySto
             try: batch = next(data_iter)
             except StopIteration: data_iter = iter(loader); batch = next(data_iter)
             batch = batch.to(device)
-            with autocast(device_type=device.type, dtype=amp_dtype, enabled=use_amp):
+            with autocast(device.type, dtype=amp_dtype, enabled=use_amp):
                 logits, _ = model(batch[:, :-1])
                 loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), batch[:, 1:].reshape(-1), ignore_index=tok.pad_token_id)
                 loss = loss / config.gradient_accumulation_steps
@@ -491,7 +491,7 @@ def finetune(model, config, samples=None, steps=200, use_lora=True, tokenizer=No
     opt = create_optimizer(model, config)
     use_amp = device.type == "cuda"
     amp_dtype = torch.bfloat16 if use_amp and torch.cuda.is_bf16_supported() else torch.float16
-    scaler = GradScaler(enabled=use_amp and amp_dtype == torch.float16)
+    scaler = GradScaler("cuda", enabled=use_amp and amp_dtype == torch.float16)
     model.train(); accum = 0.0
     for step in tqdm(range(steps), desc="Fine-tuning"):
         lr = get_lr(step, config, steps)
@@ -499,7 +499,7 @@ def finetune(model, config, samples=None, steps=200, use_lora=True, tokenizer=No
         batch = create_instruction_batch(random.choices(samples, k=min(config.batch_size, len(samples))), tok, config.max_seq_len)
         ids, labels, mask = batch["input_ids"].to(device), batch["labels"].to(device), batch["loss_mask"].to(device)
         opt.zero_grad(set_to_none=True)
-        with autocast(device_type=device.type, dtype=amp_dtype, enabled=use_amp):
+        with autocast(device.type, dtype=amp_dtype, enabled=use_amp):
             logits, _ = model(ids)
             sl, slb, sm = logits[:, :-1, :].contiguous(), labels[:, 1:].contiguous(), mask[:, 1:].contiguous()
             ptl = F.cross_entropy(sl.view(-1, sl.size(-1)), slb.view(-1), reduction="none").view(slb.size())

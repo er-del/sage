@@ -9,7 +9,7 @@ import math
 import time
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from tqdm import tqdm
 from typing import Optional
 
@@ -134,7 +134,7 @@ def train(
     use_amp = device.type == "cuda"
     # prefer bf16 if the GPU supports it
     amp_dtype = torch.bfloat16 if (use_amp and torch.cuda.is_bf16_supported()) else torch.float16
-    scaler = GradScaler(enabled=(use_amp and amp_dtype == torch.float16))
+    scaler = GradScaler("cuda", enabled=(use_amp and amp_dtype == torch.float16))
 
     # ------- data loader -------
     loader = create_dataloader(config, dataset_name=dataset_name, tokenizer=tok)
@@ -181,7 +181,7 @@ def train(
             inputs = batch[:, :-1]   # all tokens except last
             targets = batch[:, 1:]   # all tokens except first
 
-            with autocast(device_type=device.type, dtype=amp_dtype, enabled=use_amp):
+            with autocast(device.type, dtype=amp_dtype, enabled=use_amp):
                 logits, _ = model(inputs)
                 loss = nn.functional.cross_entropy(
                     logits.reshape(-1, logits.size(-1)),

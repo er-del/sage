@@ -14,7 +14,7 @@ import time
 import copy
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from tqdm import tqdm
 from typing import Optional, List
 
@@ -158,7 +158,7 @@ def finetune_instruction(
     # AMP setup
     use_amp = device.type == "cuda"
     amp_dtype = torch.bfloat16 if (use_amp and torch.cuda.is_bf16_supported()) else torch.float16
-    scaler = GradScaler(enabled=(use_amp and amp_dtype == torch.float16))
+    scaler = GradScaler("cuda", enabled=(use_amp and amp_dtype == torch.float16))
 
     model.train()
     pbar = tqdm(range(total_steps), desc="Fine-tuning", unit="step")
@@ -180,7 +180,7 @@ def finetune_instruction(
 
         optimizer.zero_grad(set_to_none=True)
 
-        with autocast(device_type=device.type, dtype=amp_dtype, enabled=use_amp):
+        with autocast(device.type, dtype=amp_dtype, enabled=use_amp):
             logits, _ = model(input_ids)
             # Shift: predict next token
             shift_logits = logits[:, :-1, :].contiguous()
