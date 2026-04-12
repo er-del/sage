@@ -45,11 +45,14 @@ sage_single.py      # Consolidated single-file version for easy portability
 Ensure you have Python 3.9+ and a CUDA-compatible GPU (recommended).
 
 ```bash
-# Clone the repository
+# Clone the repository (GitHub)
 git clone https://github.com/er-del/sage.git
 cd sage
-```
-```bash
+
+# OR Clone from Hugging Face
+git clone https://huggingface.co/sage002/sage
+cd sage
+
 # Install dependencies
 pip install -r requirements.txt
 ```
@@ -125,6 +128,16 @@ Generation supports:
 - **Top-k**: Limits sampling to the most likely 'k' tokens.
 - **Top-p (Nucleus)**: Limits sampling to a cumulative probability threshold.
 - **KV-Caching**: Caches Attention keys and values to avoid redundant computation.
+
+---
+
+## 🤗 Hugging Face Model Hub
+
+This project is actively maintained on Hugging Face. You can find pre-trained checkpoints, datasets, and community discussions here:
+
+🔗 **[huggingface.co/sage002/sage](https://huggingface.co/sage002/sage)**
+
+**Developed by Antigravity AI Systems.**
 
 ---
 
