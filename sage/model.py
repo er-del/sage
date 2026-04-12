@@ -67,6 +67,8 @@ class CausalSelfAttention(nn.Module):
         x: torch.Tensor, 
         freqs_cis: torch.Tensor, 
         kv_cache: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
+    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+        B, T, C = x.size() # batch, seq_len, d_model
         q, k, v = self.wq(x), self.wk(x), self.wv(x)
         
         q = q.view(B, T, self.n_heads, self.head_dim)
