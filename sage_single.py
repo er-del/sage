@@ -533,13 +533,15 @@ def finetune(model, config, samples=None, steps=200, use_lora=True, tokenizer=No
 # ===================================================================
 
 def quantize_int8(model):
-    model = model.cpu().eval()
+    base = getattr(model, "module", model)
+    model = base.cpu().eval()
     q = torch.quantization.quantize_dynamic(model, {nn.Linear}, dtype=torch.qint8)
     logger.info("INT8 quantization complete.")
     return q
 
 def prune_model(model, amount=0.3):
-    for _, m in model.named_modules():
+    base = getattr(model, "module", model)
+    for _, m in base.named_modules():
         if isinstance(m, nn.Linear):
             prune.l1_unstructured(m, "weight", amount=amount)
             prune.remove(m, "weight")

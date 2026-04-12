@@ -33,16 +33,17 @@ def quantize_int8(model: SageModel) -> nn.Module:
     -------
     nn.Module — the quantized model (on CPU).
     """
-    model = model.cpu().eval()
+    base_model = getattr(model, "module", model)
+    base_model = base_model.cpu().eval()
 
     quantized = torch.quantization.quantize_dynamic(
-        model,
+        base_model,
         {nn.Linear},         # quantize all linear layers
         dtype=torch.qint8,
     )
 
     # Report size reduction
-    orig_size = sum(p.numel() * p.element_size() for p in model.parameters())
+    orig_size = sum(p.numel() * p.element_size() for p in base_model.parameters())
     # Quantized parameters may not report element_size correctly,
     # so we estimate based on INT8 = 1 byte per weight.
     quant_size = sum(p.numel() for p in quantized.parameters())  # * 1 byte
@@ -75,7 +76,8 @@ def prune_model(model: SageModel, amount: float = 0.3) -> SageModel:
     pruned_count = 0
     total_count = 0
 
-    for name, module in model.named_modules():
+    base_model = getattr(model, "module", model)
+    for name, module in base_model.named_modules():
         if isinstance(module, nn.Linear):
             prune.l1_unstructured(module, name="weight", amount=amount)
             prune.remove(module, "weight")  # make the pruning permanent
