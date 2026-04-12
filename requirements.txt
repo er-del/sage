@@ -1,0 +1,7 @@
+torch>=2.0.0
+tiktoken>=0.5.1
+datasets>=2.14.0
+faiss-cpu>=1.7.4
+tqdm>=4.66.1
+bitsandbytes>=0.41.0
+numpy<2.0.0
