@@ -337,7 +337,7 @@ class StreamingTextDataset(IterableDataset):
 def create_dataloader(config, dataset_name="HuggingFaceFW/fineweb-edu", tokenizer=None):
     tok = tokenizer or SageTokenizer()
     ds = StreamingTextDataset(dataset_name=dataset_name, seq_len=config.max_seq_len, tokenizer=tok)
-    return DataLoader(ds, batch_size=config.batch_size, num_workers=0, pin_memory=True, drop_last=True)
+    return DataLoader(ds, batch_size=config.batch_size, num_workers=2, pin_memory=True, drop_last=True)
 
 
 # ===================================================================
@@ -356,15 +356,34 @@ def create_optimizer(model, config):
     for n, p in model.named_parameters():
         if not p.requires_grad: continue
         (no_decay if p.ndim == 1 or "bias" in n else decay).append(p)
+    # Enable Fused AdamW for 10% speedup if CUDA is active
+    use_fused = torch.cuda.is_available() and 'fused' in torch.optim.AdamW.__init__.__code__.co_varnames
     return torch.optim.AdamW([
         {"params": decay, "weight_decay": config.weight_decay},
         {"params": no_decay, "weight_decay": 0.0},
-    ], lr=config.learning_rate, betas=(0.9, 0.95))
+    ], lr=config.learning_rate, betas=(0.9, 0.95), fused=use_fused)
 
 def train_model(model, config, total_steps=500, dataset_name="roneneldan/TinyStories", resume=True, tokenizer=None):
     device = config.device
+    # --- TURBO MODE: TF32 & COMPILE ---
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision('high')
+    
     model = model.to(device)
     tok = tokenizer or SageTokenizer()
+    
+    # Wrap model with torch.compile for graph-level optimization
+    # mode="reduce-overhead" is ideal for smaller-to-medium models like SAGE
+    if hasattr(torch, "compile"):
+        logger.info("Turbo Mode: Compiling model graph...")
+        # Compile the base model (unwrapped from DataParallel if present)
+        base = getattr(model, "module", model)
+        compiled_base = torch.compile(base, mode="reduce-overhead")
+        if hasattr(model, "module"):
+            model.module = compiled_base
+        else:
+            model = compiled_base
+
     opt = create_optimizer(model, config)
     start_step = 0
     if resume:

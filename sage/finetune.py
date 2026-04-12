@@ -150,8 +150,23 @@ def finetune_instruction(
     -------
     SageModel — the fine-tuned model (LoRA merged if applicable).
     """
+    # --- TURBO MODE: TF32 & COMPILE ---
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision('high')
+
     device = config.device
     model = model.to(device)
+    
+    # Wrap model with torch.compile for graph-level optimization
+    if hasattr(torch, "compile"):
+        logger.info("Turbo Mode: Compiling fine-tune engine...")
+        base = getattr(model, "module", model)
+        compiled_base = torch.compile(base, mode="reduce-overhead")
+        if hasattr(model, "module"):
+            model.module = compiled_base
+        else:
+            model = compiled_base
+
     tok = tokenizer or SageTokenizer()
 
     if use_lora:

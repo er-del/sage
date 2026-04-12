@@ -71,11 +71,14 @@ def create_optimizer(model: SageModel, config: SageConfig) -> torch.optim.AdamW:
         {"params": no_decay_params, "weight_decay": 0.0},
     ]
 
+    # Enable Fused AdamW for 10% speedup if CUDA is active
+    use_fused = torch.cuda.is_available() and 'fused' in torch.optim.AdamW.__init__.__code__.co_varnames
     optimizer = torch.optim.AdamW(
         param_groups,
         lr=config.learning_rate,
         betas=(0.9, 0.95),
         eps=1e-8,
+        fused=use_fused,
     )
     return optimizer
 
@@ -115,8 +118,22 @@ def train(
     SageModel
         The trained model (on config.device).
     """
+    # --- TURBO MODE: TF32 & COMPILE ---
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision('high')
+
     device = config.device
     model = model.to(device)
+
+    # Wrap model with torch.compile for graph-level optimization
+    if hasattr(torch, "compile"):
+        logger.info("Turbo Mode: Compiling model graph...")
+        base = getattr(model, "module", model)
+        compiled_base = torch.compile(base, mode="reduce-overhead")
+        if hasattr(model, "module"):
+            model.module = compiled_base
+        else:
+            model = compiled_base
 
     tok = tokenizer or SageTokenizer()
     optimizer = create_optimizer(model, config)

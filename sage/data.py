@@ -186,7 +186,7 @@ def create_dataloader(
     return DataLoader(
         ds,
         batch_size=config.batch_size,
-        num_workers=0,   # streaming datasets work best with 0 workers
+        num_workers=2,
         pin_memory=True,
         drop_last=True,
     )
