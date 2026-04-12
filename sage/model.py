@@ -32,17 +32,30 @@ def apply_rotary_emb(xq: torch.Tensor, xk: torch.Tensor, freqs_cis: torch.Tensor
     
     return xq_out.type_as(xq), xk_out.type_as(xk)
 
+def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
+    """Repeat Key/Value heads n_rep times to match number of Query heads."""
+    if n_rep == 1:
+        return x
+    B, T, n_kv_heads, head_dim = x.size()
+    return (
+        x[:, :, :, None, :]
+        .expand(B, T, n_kv_heads, n_rep, head_dim)
+        .reshape(B, T, n_kv_heads * n_rep, head_dim)
+    )
+
 class CausalSelfAttention(nn.Module):
     def __init__(self, config: SageConfig):
         super().__init__()
         self.n_heads = config.n_heads
+        self.n_kv_heads = config.n_kv_heads
+        self.n_rep = self.n_heads // self.n_kv_heads
         self.d_model = config.d_model
         assert self.d_model % self.n_heads == 0
         self.head_dim = self.d_model // self.n_heads
         
-        self.wq = nn.Linear(self.d_model, self.d_model, bias=False)
-        self.wk = nn.Linear(self.d_model, self.d_model, bias=False)
-        self.wv = nn.Linear(self.d_model, self.d_model, bias=False)
+        self.wq = nn.Linear(self.d_model, self.n_heads * self.head_dim, bias=False)
+        self.wk = nn.Linear(self.d_model, self.n_kv_heads * self.head_dim, bias=False)
+        self.wv = nn.Linear(self.d_model, self.n_kv_heads * self.head_dim, bias=False)
         self.wo = nn.Linear(self.d_model, self.d_model, bias=False)
         
         self.resid_dropout = nn.Dropout(config.dropout)
@@ -54,14 +67,11 @@ class CausalSelfAttention(nn.Module):
         x: torch.Tensor, 
         freqs_cis: torch.Tensor, 
         kv_cache: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
-    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
-        B, T, C = x.size() # batch, seq_len, d_model
-        
         q, k, v = self.wq(x), self.wk(x), self.wv(x)
         
         q = q.view(B, T, self.n_heads, self.head_dim)
-        k = k.view(B, T, self.n_heads, self.head_dim)
-        v = v.view(B, T, self.n_heads, self.head_dim)
+        k = k.view(B, T, self.n_kv_heads, self.head_dim)
+        v = v.view(B, T, self.n_kv_heads, self.head_dim)
         
         q, k = apply_rotary_emb(q, k, freqs_cis)
         
@@ -74,6 +84,10 @@ class CausalSelfAttention(nn.Module):
         else:
             new_kv_cache = None
             
+        # Repeat KV heads to match Q heads (GQA)
+        k = repeat_kv(k, self.n_rep)
+        v = repeat_kv(v, self.n_rep)
+
         # Move heads to correct dimension: (B, n_heads, T, head_dim)
         q = q.transpose(1, 2)
         k = k.transpose(1, 2)

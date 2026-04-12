@@ -30,6 +30,7 @@ from torch.amp import GradScaler, autocast
 from torch.utils.data import IterableDataset, DataLoader
 from tqdm import tqdm
 import tiktoken
+import wandb
 
 __version__ = "1.0.0"
 
@@ -42,6 +43,7 @@ __version__ = "1.0.0"
 class SageConfig:
     d_model: int = 512
     n_heads: int = 8
+    n_kv_heads: int = 4
     n_layers: int = 6
     d_ff: int = 2048
     n_experts: int = 4
@@ -57,6 +59,7 @@ class SageConfig:
     weight_decay: float = 0.01
     max_grad_norm: float = 1.0
     checkpoint_dir: str = "checkpoints"
+    project_name: str = "sage-v2"
 
     @property
     def device(self):
@@ -151,15 +154,22 @@ def apply_rotary_emb(xq, xk, freqs_cis):
     xk_out = torch.view_as_real(xk_ * fc).flatten(3)
     return xq_out.type_as(xq), xk_out.type_as(xk)
 
+def repeat_kv(x, n_rep):
+    if n_rep == 1: return x
+    B, T, n_kv_heads, head_dim = x.size()
+    return x[:, :, :, None, :].expand(B, T, n_kv_heads, n_rep, head_dim).reshape(B, T, n_kv_heads * n_rep, head_dim)
+
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.n_heads = config.n_heads
+        self.n_kv_heads = config.n_kv_heads
+        self.n_rep = self.n_heads // self.n_kv_heads
         self.d_model = config.d_model
         self.head_dim = config.d_model // config.n_heads
-        self.wq = nn.Linear(config.d_model, config.d_model, bias=False)
-        self.wk = nn.Linear(config.d_model, config.d_model, bias=False)
-        self.wv = nn.Linear(config.d_model, config.d_model, bias=False)
+        self.wq = nn.Linear(config.d_model, config.n_heads * self.head_dim, bias=False)
+        self.wk = nn.Linear(config.d_model, config.n_kv_heads * self.head_dim, bias=False)
+        self.wv = nn.Linear(config.d_model, config.n_kv_heads * self.head_dim, bias=False)
         self.wo = nn.Linear(config.d_model, config.d_model, bias=False)
         self.resid_dropout = nn.Dropout(config.dropout)
 
@@ -167,8 +177,8 @@ class CausalSelfAttention(nn.Module):
         B, T, C = x.size()
         q, k, v = self.wq(x), self.wk(x), self.wv(x)
         q = q.view(B, T, self.n_heads, self.head_dim)
-        k = k.view(B, T, self.n_heads, self.head_dim)
-        v = v.view(B, T, self.n_heads, self.head_dim)
+        k = k.view(B, T, self.n_kv_heads, self.head_dim)
+        v = v.view(B, T, self.n_kv_heads, self.head_dim)
         q, k = apply_rotary_emb(q, k, freqs_cis)
         if kv_cache is not None:
             k = torch.cat([kv_cache[0], k], dim=1)
@@ -176,6 +186,7 @@ class CausalSelfAttention(nn.Module):
             new_kv = (k, v)
         else:
             new_kv = None
+        k, v = repeat_kv(k, self.n_rep), repeat_kv(v, self.n_rep)
         q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
         is_causal = kv_cache is None and T > 1
         try:
@@ -293,11 +304,13 @@ def clean_text(text):
     return text.strip()
 
 class StreamingTextDataset(IterableDataset):
-    def __init__(self, dataset_name="roneneldan/TinyStories", split="train", seq_len=512, tokenizer=None, buffer_size=1000, text_field="text"):
+    def __init__(self, dataset_name="HuggingFaceFW/fineweb-edu", split="train", seq_len=512, tokenizer=None, buffer_size=1000, text_field="text"):
         super().__init__()
         self.dataset_name, self.split, self.seq_len = dataset_name, split, seq_len
         self.tokenizer = tokenizer or SageTokenizer()
         self.buffer_size, self.text_field = buffer_size, text_field
+        if "fineweb-edu" in dataset_name.lower(): self.text_field = "text"
+        elif "tinystories" in dataset_name.lower(): self.text_field = "text"
 
     def _tokens(self):
         from datasets import load_dataset
@@ -321,7 +334,7 @@ class StreamingTextDataset(IterableDataset):
         random.shuffle(buf)
         yield from buf
 
-def create_dataloader(config, dataset_name="roneneldan/TinyStories", tokenizer=None):
+def create_dataloader(config, dataset_name="HuggingFaceFW/fineweb-edu", tokenizer=None):
     tok = tokenizer or SageTokenizer()
     ds = StreamingTextDataset(dataset_name=dataset_name, seq_len=config.max_seq_len, tokenizer=tok)
     return DataLoader(ds, batch_size=config.batch_size, num_workers=0, pin_memory=True, drop_last=True)
@@ -362,6 +375,7 @@ def train_model(model, config, total_steps=500, dataset_name="roneneldan/TinySto
     scaler = GradScaler("cuda", enabled=use_amp and amp_dtype == torch.float16)
     loader = create_dataloader(config, dataset_name, tok)
     data_iter = iter(loader)
+    wandb.init(project=config.project_name, name=f"pretrain-{time.strftime('%Y%m%d-%H%M')}", config=config.__dict__)
     model.train()
     accum_loss, t0 = 0.0, time.time()
     pbar = tqdm(range(start_step, total_steps), desc="Training")
@@ -387,11 +401,13 @@ def train_model(model, config, total_steps=500, dataset_name="roneneldan/TinySto
         if (step + 1) % 10 == 0:
             avg = accum_loss / 10
             pbar.set_postfix(loss=f"{avg:.4f}", ppl=f"{math.exp(min(avg,20)):.1f}", lr=f"{lr:.2e}")
+            wandb.log({"train/loss": avg, "train/perplexity": math.exp(min(avg, 20)), "train/lr": lr}, step=step + 1)
             accum_loss = 0.0
         if (step + 1) % 100 == 0:
             save_checkpoint(model, opt, step + 1, config.checkpoint_dir)
     save_checkpoint(model, opt, total_steps, config.checkpoint_dir)
     logger.info("Training complete.")
+    wandb.finish()
     return model
 
 
@@ -517,6 +533,7 @@ def finetune(model, config, samples=None, steps=200, use_lora=True, tokenizer=No
     use_amp = device.type == "cuda"
     amp_dtype = torch.bfloat16 if use_amp and torch.cuda.is_bf16_supported() else torch.float16
     scaler = GradScaler("cuda", enabled=use_amp and amp_dtype == torch.float16)
+    wandb.init(project=config.project_name, name=f"finetune-{time.strftime('%Y%m%d-%H%M')}", config=config.__dict__)
     model.train(); accum = 0.0
     for step in tqdm(range(steps), desc="Fine-tuning"):
         lr = get_lr(step, config, steps)
@@ -537,6 +554,7 @@ def finetune(model, config, samples=None, steps=200, use_lora=True, tokenizer=No
     if use_lora: model = merge_lora(model)
     save_checkpoint(model, None, steps, config.checkpoint_dir, "sage_finetuned.pt")
     logger.info("Fine-tuning complete.")
+    wandb.finish()
     return model
 
 

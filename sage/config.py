@@ -7,6 +7,7 @@ class SageConfig:
     # Model dimensions corresponding to T4 (16GB VRAM) fit
     d_model: int = 512
     n_heads: int = 8
+    n_kv_heads: int = 4   # GQA: must divide n_heads
     n_layers: int = 6
     d_ff: int = 2048
     
@@ -32,6 +33,7 @@ class SageConfig:
     
     # Checkpointing and path details
     checkpoint_dir: str = "checkpoints"
+    project_name: str = "sage-v2"
     
     @property
     def device(self):

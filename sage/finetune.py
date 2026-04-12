@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 from torch.amp import GradScaler, autocast
 from tqdm import tqdm
+import wandb
 from typing import Optional, List
 
 from .config import SageConfig
@@ -156,6 +157,13 @@ def finetune_instruction(
     if use_lora:
         model = inject_lora(model, rank=lora_rank)
 
+    # ------- W&B Logging -------
+    wandb.init(
+        project=config.project_name,
+        name=f"finetune-{time.strftime('%Y%m%d-%H%M')}",
+        config=config.__dict__,
+    )
+
     optimizer = create_optimizer(model, config)
 
     # AMP setup
@@ -213,6 +221,10 @@ def finetune_instruction(
             avg = accum_loss / 10
             pbar.set_postfix(loss=f"{avg:.4f}", lr=f"{lr:.2e}")
             logger.info(f"finetune step={step+1} | loss={avg:.4f}")
+            wandb.log({
+                "finetune/loss": avg,
+                "finetune/lr": lr,
+            }, step=step + 1)
             accum_loss = 0.0
 
     # Merge LoRA weights back for clean inference
@@ -221,6 +233,7 @@ def finetune_instruction(
 
     save_checkpoint(model, None, total_steps, config.checkpoint_dir, filename="sage_finetuned.pt")
     logger.info("Instruction fine-tuning complete. Checkpoint saved as sage_finetuned.pt")
+    wandb.finish()
     return model
 
 

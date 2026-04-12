@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 from torch.amp import GradScaler, autocast
 from tqdm import tqdm
+import wandb
 from typing import Optional
 
 from .config import SageConfig
@@ -140,6 +141,13 @@ def train(
     loader = create_dataloader(config, dataset_name=dataset_name, tokenizer=tok)
     data_iter = iter(loader)
 
+    # ------- W&B Logging -------
+    wandb.init(
+        project=config.project_name,
+        name=f"pretrain-{time.strftime('%Y%m%d-%H%M')}",
+        config=config.__dict__,
+    )
+
     # ------- gradient checkpointing (saves VRAM) -------
     base_model = getattr(model, "module", model)
     if hasattr(base_model, "layers"):
@@ -220,6 +228,11 @@ def train(
             logger.info(
                 f"step={step+1} | loss={avg_loss:.4f} | ppl={perplexity:.2f} | lr={lr:.2e}"
             )
+            wandb.log({
+                "train/loss": avg_loss,
+                "train/perplexity": perplexity,
+                "train/lr": lr,
+            }, step=step + 1)
             accum_loss = 0.0
 
         # ------- checkpoint every 100 steps -------
@@ -228,4 +241,5 @@ def train(
             logger.info(f"Checkpoint saved at step {step + 1}")
 
     logger.info("Training complete.")
+    wandb.finish()
     return model

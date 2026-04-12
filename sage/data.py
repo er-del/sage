@@ -79,7 +79,7 @@ class StreamingTextDataset(IterableDataset):
 
     def __init__(
         self,
-        dataset_name: str = "roneneldan/TinyStories",
+        dataset_name: str = "HuggingFaceFW/fineweb-edu",
         split: str = "train",
         seq_len: int = 512,
         tokenizer: Optional[SageTokenizer] = None,
@@ -97,6 +97,13 @@ class StreamingTextDataset(IterableDataset):
         self.text_field = text_field
         self.min_doc_len = min_doc_len
         self.max_doc_len = max_doc_len
+        
+        # Auto-adjust configuration based on popular datasets
+        if "fineweb-edu" in dataset_name.lower():
+            self.text_field = "text"
+            self.split = "train" if split == "train" else split
+        elif "tinystories" in dataset_name.lower():
+            self.text_field = "text"
 
     def _stream_tokens(self) -> Iterator[int]:
         """Yields individual token IDs from the HuggingFace dataset stream."""
@@ -164,7 +171,7 @@ class StreamingTextDataset(IterableDataset):
 
 def create_dataloader(
     config: SageConfig,
-    dataset_name: str = "roneneldan/TinyStories",
+    dataset_name: str = "HuggingFaceFW/fineweb-edu",
     split: str = "train",
     tokenizer: Optional[SageTokenizer] = None,
 ) -> DataLoader:
