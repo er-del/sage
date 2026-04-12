@@ -87,7 +87,18 @@ Once launched, simply type your message to chat with SAGE. The system uses a rol
 
 ## 👨‍🏫 Training SAGE
 
-SAGE supports real-time training directly from the CLI.
+SAGE supports real-time training either directly from the interactive REPL or via simple one-liner CLI commands (useful for background scripts).
+
+### Non-Interactive "One-Liner" Commands
+If you want to bypass the chat interface and just run a training job, pass the command as a CLI argument:
+```bash
+python sage_single.py --train 100       # Pre-train for 100 steps
+python sage_single.py --finetune 200    # Instruction-tune for 200 steps
+python sage_single.py --quantize        # Apply INT8 quantization
+```
+
+### Interactive REPL Commands
+If you are inside the chat interface, use the slash commands:
 
 ### /train [steps]
 Run pre-training using the `TinyStories` dataset (default).

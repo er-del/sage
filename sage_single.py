@@ -674,6 +674,24 @@ def main():
     rag = RAGManager(model, tok, config.device)
     hist = ConversationHistory(tok, config.max_seq_len - 128)
 
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+        args = sys.argv[2:]
+        if cmd == "--train":
+            s = int(args[0]) if args else 100
+            train_model(model, config, s, tokenizer=tok)
+            return
+        elif cmd == "--finetune":
+            s = int(args[0]) if args else 200
+            finetune(model, config, steps=s, tokenizer=tok)
+            return
+        elif cmd == "--quantize":
+            quantize_int8(model)
+            return
+        else:
+            print(f"  Unknown argument: {cmd}\n  Usage: --train [steps] | --finetune [steps] | --quantize")
+            return
+
     while True:
         try: inp = input("You: ").strip()
         except (EOFError, KeyboardInterrupt): print("\n  Goodbye!"); break

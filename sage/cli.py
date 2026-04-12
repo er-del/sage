@@ -202,6 +202,21 @@ def main() -> None:
     rag_manager = RAGManager(model, tokenizer, config.device)
     history = ConversationHistory(tokenizer, max_tokens=config.max_seq_len - 128)
 
+    # ---------- One-liner CLI arguments ----------
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+        args = sys.argv[2:]
+        if cmd == "--train":
+            handle_train(model, config, tokenizer, args)
+        elif cmd == "--finetune":
+            handle_finetune(model, config, tokenizer, args)
+        elif cmd == "--quantize":
+            handle_quantize(model)
+        else:
+            print(f"  Unknown argument: {cmd}")
+            print("  Usage: --train [steps] | --finetune [steps] | --quantize")
+        return
+
     # ---------- REPL loop ----------
     while True:
         try:
