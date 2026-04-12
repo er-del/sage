@@ -430,8 +430,9 @@ class LoRALinear(nn.Module):
         super().__init__()
         self.original = original
         self.scaling = alpha / rank
-        self.lora_A = nn.Parameter(torch.randn(original.in_features, rank) * 0.01)
-        self.lora_B = nn.Parameter(torch.zeros(rank, original.out_features))
+        device, dtype = original.weight.device, original.weight.dtype
+        self.lora_A = nn.Parameter(torch.randn(original.in_features, rank, device=device, dtype=dtype) * 0.01)
+        self.lora_B = nn.Parameter(torch.zeros(rank, original.out_features, device=device, dtype=dtype))
         original.weight.requires_grad = False
         if original.bias is not None: original.bias.requires_grad = False
 

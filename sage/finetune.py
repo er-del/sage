@@ -51,8 +51,9 @@ class LoRALinear(nn.Module):
         out_features = original.out_features
 
         # Low-rank matrices
-        self.lora_A = nn.Parameter(torch.randn(in_features, rank) * 0.01)
-        self.lora_B = nn.Parameter(torch.zeros(rank, out_features))
+        device, dtype = original.weight.device, original.weight.dtype
+        self.lora_A = nn.Parameter(torch.randn(in_features, rank, device=device, dtype=dtype) * 0.01)
+        self.lora_B = nn.Parameter(torch.zeros(rank, out_features, device=device, dtype=dtype))
 
         # Freeze the original weight
         self.original.weight.requires_grad = False
