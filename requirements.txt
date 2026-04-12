@@ -5,3 +5,4 @@ faiss-cpu>=1.7.4
 tqdm>=4.66.1
 bitsandbytes>=0.41.0
 numpy<2.0.0
+huggingface_hub>=0.20.0
