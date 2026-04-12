@@ -120,7 +120,8 @@ def generate(
     if device is None:
         device = next(model.parameters()).device
 
-    model.eval()
+    base_model = getattr(model, "module", model)
+    base_model.eval()
 
     # Encode prompt
     prompt_tokens = tokenizer.encode(prompt)
@@ -133,7 +134,7 @@ def generate(
     kv_caches = None
 
     # --- Prefill: run the full prompt through the model once ---
-    logits, kv_caches = model(input_ids)
+    logits, kv_caches = base_model(input_ids)
     next_logits = logits[:, -1, :]
 
     for _ in range(max_new_tokens):
@@ -160,11 +161,11 @@ def generate(
 
         # --- Decode step: feed only the new token, reuse KV-cache ---
         next_input = next_id.view(1, 1)
-        logits, kv_caches = model(next_input, kv_caches=kv_caches)
+        logits, kv_caches = base_model(next_input, kv_caches=kv_caches)
         next_logits = logits[:, -1, :]
 
     if stream:
         print()  # newline after streaming completes
 
-    model.train()
+    base_model.train()
     return tokenizer.decode(generated_tokens)

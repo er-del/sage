@@ -83,7 +83,8 @@ def inject_lora(model: SageModel, rank: int = 8, alpha: float = 16.0) -> SageMod
     Replace the Q, K, V, O projection layers in every attention block with
     LoRA-wrapped versions. Returns the same model (mutated in-place).
     """
-    for layer in model.layers:
+    base_model = getattr(model, "module", model)
+    for layer in base_model.layers:
         attn: CausalSelfAttention = layer.attn
         attn.wq = LoRALinear(attn.wq, rank=rank, alpha=alpha)
         attn.wk = LoRALinear(attn.wk, rank=rank, alpha=alpha)
@@ -105,7 +106,8 @@ def merge_lora(model: SageModel) -> SageModel:
     Merge all LoRA adapters back into the base weights and replace the
     LoRALinear wrappers with plain nn.Linear modules.
     """
-    for layer in model.layers:
+    base_model = getattr(model, "module", model)
+    for layer in base_model.layers:
         attn: CausalSelfAttention = layer.attn
         for name in ("wq", "wk", "wv", "wo"):
             module = getattr(attn, name)

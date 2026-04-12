@@ -141,8 +141,9 @@ def train(
     data_iter = iter(loader)
 
     # ------- gradient checkpointing (saves VRAM) -------
-    if hasattr(model, "layers"):
-        for layer in model.layers:
+    base_model = getattr(model, "module", model)
+    if hasattr(base_model, "layers"):
+        for layer in base_model.layers:
             layer: nn.Module
             # PyTorch gradient checkpointing
             try:

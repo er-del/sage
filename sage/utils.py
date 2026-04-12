@@ -28,9 +28,10 @@ def save_checkpoint(
     os.makedirs(checkpoint_dir, exist_ok=True)
     path = os.path.join(checkpoint_dir, filename)
     
+    base_model = getattr(model, "module", model)
     checkpoint = {
         'step': step,
-        'model_state_dict': model.state_dict(),
+        'model_state_dict': base_model.state_dict(),
     }
     
     if optimizer is not None:
@@ -57,7 +58,8 @@ def load_checkpoint(
     # Load to CPU first to avoid VRAM spikes, then the module will be moved later if needed
     checkpoint = torch.load(path, map_location=device)
     
-    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+    base_model = getattr(model, "module", model)
+    base_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
     
     if optimizer is not None and 'optimizer_state_dict' in checkpoint:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])

@@ -86,7 +86,8 @@ logger = setup_logger("sage")
 def save_checkpoint(model, optimizer, step, checkpoint_dir, filename="sage_latest.pt"):
     os.makedirs(checkpoint_dir, exist_ok=True)
     path = os.path.join(checkpoint_dir, filename)
-    ckpt = {"step": step, "model_state_dict": model.state_dict()}
+    base = getattr(model, "module", model)
+    ckpt = {"step": step, "model_state_dict": base.state_dict()}
     if optimizer is not None:
         ckpt["optimizer_state_dict"] = optimizer.state_dict()
     torch.save(ckpt, path)
@@ -98,7 +99,8 @@ def load_checkpoint(model, optimizer, checkpoint_dir, filename="sage_latest.pt",
         logger.warning(f"No checkpoint at {path}, starting fresh.")
         return model, optimizer, 0
     ckpt = torch.load(path, map_location=device)
-    model.load_state_dict(ckpt["model_state_dict"], strict=False)
+    base = getattr(model, "module", model)
+    base.load_state_dict(ckpt["model_state_dict"], strict=False)
     if optimizer and "optimizer_state_dict" in ckpt:
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
     step = ckpt.get("step", 0)
@@ -402,10 +404,11 @@ def sample_next(logits, temperature=0.8, top_k=50, top_p=0.9, greedy=False):
 @torch.no_grad()
 def generate(model, tokenizer, prompt, max_new=256, temperature=0.8, top_k=50, top_p=0.9, stream=True, device=None):
     device = device or next(model.parameters()).device
-    model.eval()
+    base = getattr(model, "module", model)
+    base.eval()
     ids = tokenizer.encode(prompt) or [tokenizer.eos_token_id]
     inp = torch.tensor([ids], dtype=torch.long, device=device)
-    logits, kvs = model(inp)
+    logits, kvs = base(inp)
     gen = list(ids)
     nl = logits[:, -1, :]
     for _ in range(max_new):
@@ -414,10 +417,10 @@ def generate(model, tokenizer, prompt, max_new=256, temperature=0.8, top_k=50, t
         if tid == tokenizer.eos_token_id: break
         gen.append(tid)
         if stream: print(tokenizer.decode([tid]), end="", flush=True)
-        logits, kvs = model(nid.view(1, 1), kv_caches=kvs)
+        logits, kvs = base(nid.view(1, 1), kv_caches=kvs)
         nl = logits[:, -1, :]
     if stream: print()
-    model.train()
+    base.train()
     return tokenizer.decode(gen)
 
 
@@ -446,16 +449,18 @@ class LoRALinear(nn.Module):
         return m
 
 def inject_lora(model, rank=8, alpha=16.0):
-    for layer in model.layers:
+    base = getattr(model, "module", model)
+    for layer in base.layers:
         a = layer.attn
         for name in ("wq", "wk", "wv", "wo"):
             setattr(a, name, LoRALinear(getattr(a, name), rank, alpha))
-    tp = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    tp = sum(p.numel() for p in base.parameters() if p.requires_grad)
     logger.info(f"LoRA injected (rank={rank}). Trainable params: {tp:,}")
     return model
 
 def merge_lora(model):
-    for layer in model.layers:
+    base = getattr(model, "module", model)
+    for layer in base.layers:
         a = layer.attn
         for name in ("wq", "wk", "wv", "wo"):
             m = getattr(a, name)
@@ -548,9 +553,10 @@ def prune_model(model, amount=0.3):
 
 def _embed(text, tokenizer, model, device):
     toks = tokenizer.encode(text)
-    if not toks: return np.zeros(model.wte.weight.shape[1], dtype=np.float32)
+    base = getattr(model, "module", model)
+    if not toks: return np.zeros(base.wte.weight.shape[1], dtype=np.float32)
     with torch.no_grad():
-        emb = model.wte(torch.tensor([toks], device=device)).mean(1)
+        emb = base.wte(torch.tensor([toks], device=device)).mean(1)
         emb = F.normalize(emb, p=2, dim=-1)
     return emb.squeeze(0).cpu().numpy()
 
@@ -573,7 +579,8 @@ class VectorStore:
 class RAGManager:
     def __init__(self, model, tokenizer, device, chunk_size=200):
         self.model, self.tokenizer, self.device = model, tokenizer, device
-        self.store = VectorStore(model.wte.weight.shape[1])
+        base = getattr(model, "module", model)
+        self.store = VectorStore(base.wte.weight.shape[1])
         self.enabled = False
 
     def add_documents(self, texts):
@@ -663,8 +670,12 @@ def main():
     config.vocab_size = tok.vocab_size
     print("  Initializing SAGE …")
     model = SageModel(config).to(config.device)
+    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        print(f"  Multi-GPU detected: {torch.cuda.device_count()} GPUs. Using DataParallel.")
+        model = nn.DataParallel(model)
     model, _, step = load_checkpoint(model, None, config.checkpoint_dir, device=str(config.device))
-    total = sum(p.numel() for p in model.parameters())
+    base = getattr(model, "module", model)
+    total = sum(p.numel() for p in base.parameters())
     print(BANNER.format(ver=__version__))
     print(f"  Params: {total:,} ({total/1e6:.1f}M) | Context: {config.max_seq_len} | Device: {config.device}")
     print(f"  Layers: {config.n_layers} | Heads: {config.n_heads} | Experts: {config.n_experts}")

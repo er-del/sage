@@ -44,8 +44,9 @@ BANNER = r"""
 
 def print_banner(model: SageModel, config: SageConfig) -> None:
     """Display startup banner with model statistics."""
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    base_model = getattr(model, "module", model)
+    total_params = sum(p.numel() for p in base_model.parameters())
+    trainable_params = sum(p.numel() for p in base_model.parameters() if p.requires_grad)
 
     print(BANNER.format(version=__version__))
     print(f"  Model params  : {total_params:,} ({total_params/1e6:.1f}M)")
@@ -188,6 +189,10 @@ def main() -> None:
     print("  Initializing SAGE model …")
     model = SageModel(config)
     model = model.to(config.device)
+
+    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        print(f"  Multi-GPU detected! Wrapping model in DataParallel across {torch.cuda.device_count()} GPUs.")
+        model = torch.nn.DataParallel(model)
 
     # Attempt to load existing checkpoint
     model, _, loaded_step = load_checkpoint(
