@@ -46,8 +46,10 @@ Ensure you have Python 3.9+ and a CUDA-compatible GPU (recommended).
 
 ```bash
 # Clone the repository
-cd LLM_MOdel
-
+git clone https://github.com/er-del/sage.git
+cd sage
+```
+```bash
 # Install dependencies
 pip install -r requirements.txt
 ```
