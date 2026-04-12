@@ -6,6 +6,11 @@ Designed to be both educational and functional, SAGE can be trained, fine-tuned,
 
 ---
 
+## ☁️ Cloud Quickstart (Kaggle / Colab)
+Running SAGE in the cloud? Check out the **[Kaggle & Colab Quickstart Guide](file:///c:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/SAGE_KAGGLE_GUIDE.md)** for one-click setup and a premium interactive chat interface.
+
+---
+
 ## 🚀 Key Features
 
 - **Decoder-Only Transformer**: A GPT-style architecture with pre-layer normalization.

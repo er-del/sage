@@ -98,7 +98,7 @@ class CausalSelfAttention(nn.Module):
         # Flash attention natively supported via scaled_dot_product_attention
         is_causal = (kv_cache is None and T > 1)
         try:
-            y = F.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=0.0 if not self.training else 0.1, is_causal=is_causal)
+            y = F.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=self.resid_dropout.p if self.training else 0.0, is_causal=is_causal)
         except Exception:
             # Manual attention fallback for older architectures (like P100 sm_60)
             attn_weights = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
@@ -109,7 +109,7 @@ class CausalSelfAttention(nn.Module):
             
             attn_weights = F.softmax(attn_weights, dim=-1)
             if self.training:
-                attn_weights = F.dropout(attn_weights, p=0.1)
+                attn_weights = self.resid_dropout(attn_weights)
                 
             y = attn_weights @ v
         
