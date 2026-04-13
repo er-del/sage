@@ -25,6 +25,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+hf_push.py
+.hugging_face_ignore
 
 # PyInstaller
 #  Usually these files are written by a python script, before a-one-file pack

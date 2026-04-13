@@ -1,0 +1,51 @@
+# Hugging Face Hub Ignore Patterns
+# Files matching these patterns will not be uploaded to HF Hub
+# via huggingface_hub upload operations
+
+# Git files
+.git/*
+.gitignore
+
+# Python virtual environments
+.venv/*
+venv/*
+env/*
+
+# Python cache
+__pycache__/*
+*.py[cod]
+*$py.class
+*.so
+
+# Checkpoints and large model files (handled separately via git-lfs or release assets)
+checkpoints/*
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+
+# Development scripts
+hf_push.py
+
+# Logs and local data
+wandb/*
+logs/*
+*.log
+
+# IDE and OS files
+.vscode/*
+.idea/*
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Documentation (keep README.md but ignore other docs)
+SAGE_KAGGLE_GUIDE.md
+SAGE_V3_ROADMAP.md
+
+# Distribution
+build/*
+dist/*
+*.egg-info/
