@@ -6,6 +6,7 @@ import pytest
 def test_validation_suite_roundtrip(tmp_path: Path) -> None:
     spm = pytest.importorskip("sentencepiece")
     from tokenizer.validate_tokenizer import run_validation_suite
+    from tokenizer.train_tokenizer import train_sentencepiece
 
     corpus = tmp_path / "corpus.txt"
     corpus.write_text(
@@ -16,22 +17,9 @@ def test_validation_suite_roundtrip(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     prefix = tmp_path / "spm"
-    spm.SentencePieceTrainer.train(
-        input=str(corpus),
-        model_prefix=str(prefix),
-        model_type="bpe",
-        vocab_size=300,
-        character_coverage=0.9995,
-        byte_fallback=True,
-        bos_id=0,
-        eos_id=1,
-        pad_id=2,
-        unk_id=3,
-        user_defined_symbols=["[INST]", "[/INST]"],
-        split_digits=False,
-        split_by_unicode_script=False,
-        remove_extra_whitespaces=False,
-        normalization_rule_name="identity",
-    )
+    # Byte fallback adds 256 byte pieces plus meta tokens, so tiny vocab sizes
+    # can fail even for small corpora. Use the real training helper and leave
+    # slack above that floor.
+    train_sentencepiece(str(corpus), str(prefix), vocab_size=512)
     results = run_validation_suite(str(prefix) + ".model")
     assert all(result.passed for result in results), results

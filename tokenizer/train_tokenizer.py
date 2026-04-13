@@ -45,6 +45,7 @@ def train_sentencepiece(input_path: str, model_prefix: str, vocab_size: int = 50
         split_by_unicode_script=False,
         remove_extra_whitespaces=False,
         normalization_rule_name="identity",
+        hard_vocab_limit=False,
     )
 
 
