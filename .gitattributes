@@ -5,7 +5,7 @@
 # Git files
 .git/*
 .gitignore
-
+hf_push.py
 # Python virtual environments
 .venv/*
 venv/*
@@ -24,9 +24,6 @@ checkpoints/*
 *.pt
 *.pth
 *.ckpt
-
-# Development scripts
-hf_push.py
 
 # Logs and local data
 wandb/*

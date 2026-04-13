@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 wandb/
+hf_push.py
 
 # C extensions
 *.so
@@ -112,12 +113,6 @@ celerybeat.pid
 
 # Sage Project Specific
 checkpoints/
-runs/
-tokenizer/*.model
-tokenizer/*.vocab
-tokenizer/training_corpus.txt
-data/raw/
-data/processed/
 .venv/
 .env
 .DS_Store

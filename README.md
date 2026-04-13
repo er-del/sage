@@ -1,455 +1,163 @@
-# SAGE 1B
+# SAGE — Self-Adaptive General Engine
 
-SAGE is a root-level rewrite of this repository into a production-style dense language model project. The current baseline is a 1B-class decoder-only transformer with RMSNorm, RoPE, grouped-query attention, SwiGLU, SentencePiece, resumable training, Parquet-backed datasets, and FastAPI serving.
+**SAGE** is a senior-grade, production-structured Large Language Model (LLM) system built entirely from scratch using Python and PyTorch. It implements modern transformer architectures including Mixture of Experts (MoE), Rotary Positional Embeddings (RoPE), and Low-Rank Adaptation (LoRA).
 
-This README is written as a practical operator guide. It tells you:
+Designed to be both educational and functional, SAGE can be trained, fine-tuned, quantized, and deployed on a single consumer GPU (e.g., NVIDIA T4 with 16GB VRAM).
 
-- what the project contains
-- what is already implemented
-- what commands to run
-- what files are inputs and outputs
-- what parts are scaffolding versus fully wired
+---
 
-## What SAGE Is
+## ☁️ Cloud Quickstart (Kaggle / Colab)
+Running SAGE in the cloud? Check out the **[Kaggle & Colab Quickstart Guide](file:///c:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/SAGE_KAGGLE_GUIDE.md)** for one-click setup and a premium interactive chat interface.
 
-SAGE is organized into these layers:
+---
 
-1. `tokenizer/`
-   Trains and validates a SentencePiece tokenizer.
-2. `data/`
-   Handles raw corpus ingest, filtering, deduplication, sharding, and packed datasets.
-3. `model/`
-   Implements the dense decoder-only transformer.
-4. `train/`
-   Handles optimizer setup, scheduler, hardware detection, checkpoints, and the training loop.
-5. `eval/`
-   Provides perplexity evaluation and benchmark harness registration.
-6. `serve/`
-   Exposes FastAPI servers and quantization helpers.
+## 🚀 Key Features
 
-## Current Baseline
+- **Decoder-Only Transformer**: A GPT-style architecture with pre-layer normalization.
+- **Mixture of Experts (MoE)**: Efficient scaling with a learned router selecting top-k experts per token.
+- **Rotary Positional Embeddings (RoPE)**: Enhanced long-sequence generalization.
+- **KV-Cache Inference**: O(1) time-per-token generation for high-speed response.
+- **Retrieval-Augmented Generation (RAG)**: Integration with FAISS for document-based context lookup.
+- **Efficient Fine-Tuning**: Support for LoRA and instruction tuning with loss masking.
+- **Post-Training Quantization**: INT8 support to reduce memory footprint.
+- **Interactive CLI**: A full REPL (Read-Eval-Print Loop) for chatting and system management.
 
-| Component | Value |
-| --- | --- |
-| Layers | 24 |
-| d_model | 2048 |
-| Attention heads | 16 |
-| KV heads | 8 |
-| Head dim | 128 |
-| FFN dim | 5632 |
-| Context length | 4096 |
-| Vocab size | 50000 |
-| Norm | RMSNorm |
-| Positional encoding | RoPE |
-| Attention | GQA + SDPA |
-| Activation | SwiGLU |
-| Weight tying | Enabled |
+---
 
-## Repository Layout
+## 📂 Project Structure
 
 ```text
-configs/
-  model/         model YAMLs for 1B, 3B, 7B
-  data/          corpus mix and shard config
-  train/         LR, checkpoint, and logging schedule
-data/
-  ingest.py      raw source registry and streaming helpers
-  filter.py      license/lang/PII/safety/quality filtering
-  dedup.py       exact and near-duplicate removal
-  shard.py       tokenization + parquet shard writing + manifest
-  dataset.py     packed iterable dataset with resume skip()
-tokenizer/
-  train_tokenizer.py
-  validate_tokenizer.py
-model/
-  config.py
-  rmsnorm.py
-  rope.py
-  attention.py
-  mlp.py
-  block.py
-  model.py
-train/
-  loss.py
-  optimizer.py
-  checkpoint.py
-  distributed.py
-  hardware.py
-  trainer.py
-eval/
-  perplexity.py
-  benchmarks.py
-  long_context.py
-  regression.py
-serve/
-  kv_cache.py
-  quantize.py
-  server.py
-  server_cpu.py
-scripts/
-  run_data_pipeline.sh
-  run_training.sh
-  run_eval.sh
-  run_serve.sh
-  run_serve_cpu.sh
-  run_validate_tokenizer.sh
-tests/
+sage/
+├── model.py        # Core architecture (Transformer, MoE, RoPE, Attention)
+├── data.py         # Tokenization (tiktoken) & Streaming Datasets (HuggingFace)
+├── train.py        # Pre-training loop with AdamW, AMP, and Cosine Decay
+├── inference.py    # Text generation (Greedy, Temp, Top-k, Top-p sampling)
+├── finetune.py     # LoRA implementation & Instruction Tuning
+├── optimize.py     # INT8 Quantization & Pruning utilities
+├── memory.py       # RAG Vector Store & Conversation History
+├── cli.py          # Interactive Terminal Interface
+├── utils.py        # Logging, Checkpointing, and Helper functions
+├── config.py       # Central Hyperparameter Configuration
+└── requirements.txt # System dependencies
+sage_single.py      # Consolidated single-file version for easy portability
 ```
 
-## What Is Fully Working vs. What Is Scaffolded
+---
 
-### Working now
+## 🛠️ Installation & Setup
 
-- tokenizer training
-- tokenizer validation
-- data filtering and dedup helpers
-- packed dataset logic
-- dense transformer forward pass
-- checkpoint save and resume
-- hardware detection
-- trainer entrypoint
-- FastAPI health and basic generate endpoint
-- unit and smoke tests
-
-### Scaffolded but not yet a full production runner
-
-- benchmark execution against downloaded external datasets
-- a single end-to-end corpus build command that downloads and preprocesses public corpora automatically
-- production-grade multi-node launch tooling
-- real llama.cpp server wiring beyond availability checks
-
-That means the core codebase is real, but you still need to provide your own corpus files and Parquet shards before running a training job.
-
-## Install
-
-Create and activate a virtual environment, then install dependencies:
+### 1. Requirements
+Ensure you have Python 3.9+ and a CUDA-compatible GPU (recommended).
 
 ```bash
+# Clone the repository (GitHub)
+git clone https://github.com/er-del/sage.git
+cd sage
+
+# OR Clone from Hugging Face
+git clone https://huggingface.co/sage002/sage
+cd sage
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-Recommended optional extras:
+### 2. Dependencies
+- **PyTorch**: Core deep learning framework.
+- **tiktoken**: Fast BPE tokenization (OpenAI's cl100k_base).
+- **datasets**: For streaming training data from HuggingFace.
+- **faiss-cpu**: For vector-based retrieval (RAG).
+- **tqdm**: Progress bars for training.
+- **bitsandbytes**: (Optional) For advanced quantization.
 
-- `sentencepiece` is required for tokenizer training and validation
-- `bitsandbytes` is useful for 8-bit experiments
-- `llama.cpp` or `llama-cpp-python` is needed for the CPU serving path
+---
 
-## Quick Start
+## 🎮 Getting Started
 
-If you want the shortest path to verifying the repo:
-
-1. Install dependencies.
-2. Run tests.
-3. Start the FastAPI server.
-
-```bash
-pytest -q
-uvicorn serve.server:app --host 127.0.0.1 --port 8000
-```
-
-Then check:
+### Launching the CLI
+You can run the modular version or the single-file version:
 
 ```bash
-curl http://127.0.0.1:8000/health
+# Modular version
+python -m sage.cli
+
+# Single-file version
+python sage_single.py
 ```
 
-## Command Reference
+### Basic Chat
+Once launched, simply type your message to chat with SAGE. The system uses a rolling conversation history to maintain context.
 
-The detailed command guide is in [docs/COMMANDS.md](C:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/docs/COMMANDS.md:1). The most important commands are below.
+---
 
-### 1. Train tokenizer
+## 👨‍🏫 Training SAGE
 
-Cross-platform Python command:
+SAGE supports real-time training either directly from the interactive REPL or via simple one-liner CLI commands (useful for background scripts).
 
+### Non-Interactive "One-Liner" Commands
+If you want to bypass the chat interface and just run a training job, pass the command as a CLI argument:
 ```bash
-python -m tokenizer.train_tokenizer \
-  --input data/raw/general_web.txt data/raw/code.txt \
-  --model-prefix tokenizer/tokenizer \
-  --vocab-size 50000
+python sage_single.py --train 100       # Pre-train for 100 steps
+python sage_single.py --finetune 200    # Instruction-tune for 200 steps
+python sage_single.py --quantize        # Apply INT8 quantization
 ```
 
-Linux/macOS/WSL wrapper:
+### Interactive REPL Commands
+If you are inside the chat interface, use the slash commands:
 
-```bash
-bash scripts/run_data_pipeline.sh \
-  --input data/raw/general_web.txt data/raw/code.txt \
-  --model-prefix tokenizer/tokenizer \
-  --vocab-size 50000
-```
+### /train [steps]
+Run pre-training using the dataset (default).
+- `/train 100` — Trains for 100 steps and saves a checkpoint.
 
-Outputs:
+### /finetune [steps]
+Perform instruction fine-tuning using LoRA adapters.
+- `/finetune 200` — Trains on instruction/response pairs and merges weights.
 
-- `tokenizer/tokenizer.model`
-- `tokenizer/tokenizer.vocab`
-- `tokenizer/training_corpus.txt`
+---
 
-### 2. Validate tokenizer
+## 🧠 Advanced Commands
 
-```bash
-python - <<'PY'
-from tokenizer.validate_tokenizer import validate_model_file
-validate_model_file("tokenizer/tokenizer.model")
-print("tokenizer ok")
-PY
-```
+| Command | Action |
+| :--- | :--- |
+| `/save` | Manually save the current model checkpoint. |
+| `/load` | Reload the latest checkpoint from the `checkpoints` directory. |
+| `/quantize` | Convert model weights to INT8 (CPU) for reduced memory usage. |
+| `/rag on` | Enable Retrieval-Augmented Generation. |
+| `/rag add <text>` | Add new knowledge to SAGE's retrieval database. |
+| `/clear` | Clear the current conversation history. |
+| `/help` | Show the list of available commands. |
+| `/exit` | Exit the program cleanly. |
 
-Or:
+---
 
-```bash
-bash scripts/run_validate_tokenizer.sh tokenizer/tokenizer.model
-```
+## 🏗️ Architecture Details
 
-### 3. Train the model
+### Mixture of Experts (MoE)
+SAGE swaps standard FFN layers for MoE blocks. Each block contains 4 experts, where exactly 2 are activated per token via a learned linear router. This allows for higher total capacity without increasing the computational cost per token.
 
-Training expects existing Parquet shards. Example:
+### Rotary Positional Embeddings (RoPE)
+Positions are encoded via complex-valued rotations of query and key vectors. This allows SAGE to better handle sequences longer than what it was trained on compared to absolute position embeddings.
 
-```bash
-python -m train.trainer \
-  --model-config configs/model/1b.yaml \
-  --schedule-config configs/train/schedule.yaml \
-  --train-shards data/processed/shard-00000.parquet data/processed/shard-00001.parquet \
-  --validation-shards data/processed/shard-00002.parquet \
-  --output-dir runs/sage-1b
-```
+### Inference Engine
+Generation supports:
+- **Temperature**: Adjusts randomness.
+- **Top-k**: Limits sampling to the most likely 'k' tokens.
+- **Top-p (Nucleus)**: Limits sampling to a cumulative probability threshold.
+- **KV-Caching**: Caches Attention keys and values to avoid redundant computation.
 
-Useful options:
+---
 
-- `--steps 100` for a short smoke run
-- `--disable-wandb` to disable offline W&B logging
+## 🤗 Hugging Face Model Hub
 
-Example smoke run:
+This project is actively maintained on Hugging Face. You can find pre-trained checkpoints, datasets, and community discussions here:
 
-```bash
-python -m train.trainer \
-  --train-shards data/processed/shard-00000.parquet \
-  --validation-shards data/processed/shard-00001.parquet \
-  --output-dir runs/smoke \
-  --steps 20 \
-  --disable-wandb
-```
+🔗 **[huggingface.co/sage002/sage](https://huggingface.co/sage002/sage)**
 
-### 4. Run evaluation harness
+**Developed by Antigravity AI Systems.**
 
-```bash
-bash scripts/run_eval.sh
-```
+---
 
-This currently prints the registered benchmark surfaces. It is a harness check, not a full benchmark download-and-run pipeline.
+## 📜 Disclaimer
+SAGE is an experimental engine. While architecturally complete, the quality of generated responses depends heavily on the amount of training data and compute steps provided.
 
-### 5. Start the GPU server
-
-```bash
-uvicorn serve.server:app --host 0.0.0.0 --port 8000
-```
-
-Or:
-
-```bash
-bash scripts/run_serve.sh
-```
-
-### 6. Start the CPU server
-
-```bash
-uvicorn serve.server_cpu:app --host 0.0.0.0 --port 8001
-```
-
-Or:
-
-```bash
-bash scripts/run_serve_cpu.sh
-```
-
-### 7. Call the generate endpoint
-
-The current server takes token IDs directly, not raw text strings.
-
-```bash
-curl -X POST http://127.0.0.1:8000/generate \
-  -H "Content-Type: application/json" \
-  -d "{\"input_ids\": [1, 42, 99], \"max_new_tokens\": 8}"
-```
-
-Response shape:
-
-```json
-{
-  "tokens": [1, 42, 99, 123, 456]
-}
-```
-
-## How Training Works
-
-The training flow is:
-
-1. load model config from `configs/model/*.yaml`
-2. load schedule config from `configs/train/schedule.yaml`
-3. detect hardware in `train/hardware.py`
-4. build optimizer and cosine scheduler
-5. load latest checkpoint if one exists
-6. call `PackedDataset.skip()` so resume does not replay already-trained batches
-7. run forward/backward with autocast on CUDA or MPS
-8. clip gradients
-9. log metrics to `metrics.jsonl` and optionally offline W&B
-10. run validation perplexity at eval intervals
-11. save checkpoint every configured interval
-
-Important output files during training:
-
-- `runs/<run-name>/metrics.jsonl`
-- `runs/<run-name>/ckpt_step_0001000.pt`
-- later checkpoints in the same folder
-
-## How Data Is Expected to Look
-
-### Raw text files for tokenizer training
-
-Simple UTF-8 text files are enough:
-
-```text
-This is a training document.
-This is another one.
-```
-
-### Raw JSONL records for ingest/filter work
-
-The ingest layer assumes records like:
-
-```json
-{"text": "example text"}
-```
-
-### Processed Parquet shards for training
-
-The trainer expects Parquet rows with at least:
-
-- `tokens`
-- `split`
-
-The sharding helper writes:
-
-- `id`
-- `text`
-- `tokens`
-- `domain_tag`
-- `quality_tier`
-- `lang`
-- `token_count`
-- `split`
-
-## Main Config Files
-
-### [configs/model/1b.yaml](C:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/configs/model/1b.yaml:1)
-
-Controls the model shape:
-
-- layers
-- hidden size
-- heads
-- KV heads
-- FFN size
-- vocab size
-- context length
-
-### [configs/data/mix.yaml](C:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/configs/data/mix.yaml:1)
-
-Controls corpus weights and split ratios.
-
-### [configs/train/schedule.yaml](C:/Users/Lenovo/OneDrive/Desktop/Documents/LLM_MOdel/configs/train/schedule.yaml:1)
-
-Controls:
-
-- total token target
-- LR schedule
-- warmup
-- checkpoint interval
-- log interval
-- eval interval
-
-## Common Workflows
-
-### Workflow A: verify the repo
-
-```bash
-pip install -r requirements.txt
-pytest -q
-```
-
-### Workflow B: train tokenizer only
-
-```bash
-python -m tokenizer.train_tokenizer --input data/raw/general_web.txt --model-prefix tokenizer/tokenizer
-python - <<'PY'
-from tokenizer.validate_tokenizer import validate_model_file
-validate_model_file("tokenizer/tokenizer.model")
-print("ok")
-PY
-```
-
-### Workflow C: smoke-train on local shards
-
-```bash
-python -m train.trainer \
-  --train-shards data/processed/shard-00000.parquet \
-  --validation-shards data/processed/shard-00001.parquet \
-  --output-dir runs/smoke \
-  --steps 20 \
-  --disable-wandb
-```
-
-### Workflow D: serve locally
-
-```bash
-uvicorn serve.server:app --host 127.0.0.1 --port 8000
-curl http://127.0.0.1:8000/health
-```
-
-## Troubleshooting
-
-### `No training shards provided`
-
-You launched the trainer without `--train-shards`. The trainer is working as designed, but it needs Parquet shard paths.
-
-### `ModuleNotFoundError: sentencepiece`
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-### FastAPI starts but generate is not useful
-
-That is expected right now if you have not trained or loaded a checkpoint. The server instantiates the model architecture, but it does not yet load a trained checkpoint automatically.
-
-### CPU server says llama.cpp is unavailable
-
-Install `llama.cpp` or `llama-cpp-python`. The current CPU server is a readiness surface, not a bundled llama.cpp runtime.
-
-## Tests
-
-Run the full suite:
-
-```bash
-pytest -q
-```
-
-Coverage areas:
-
-- tokenizer roundtrip validation
-- model shapes
-- attention math
-- data filtering and packing
-- checkpoint roundtrip
-- hardware summaries
-- FastAPI health endpoints
-
-## Next Practical Step
-
-If you want the fastest real progress from here, the next step is:
-
-1. prepare a small local corpus
-2. train the tokenizer
-3. write Parquet shards with `data/shard.py`
-4. run a `--steps 20` smoke training job
-5. only then start extending benchmark or serving behavior
+**Developed by Antigravity AI Systems.**
