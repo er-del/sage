@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -53,3 +54,21 @@ def validate_model_file(model_path: str) -> None:
     if failed:
         details = "\n".join(f"{item.name}: {item.detail}" for item in failed)
         raise AssertionError(f"Tokenizer validation failed:\n{details}")
+
+
+def build_argparser() -> argparse.ArgumentParser:
+    """Build the tokenizer validation CLI."""
+    parser = argparse.ArgumentParser(description="Validate a SentencePiece tokenizer model.")
+    parser.add_argument("model_path", nargs="?", default="tokenizer/tokenizer.model")
+    return parser
+
+
+def main() -> None:
+    """CLI entrypoint for tokenizer validation."""
+    args = build_argparser().parse_args()
+    validate_model_file(args.model_path)
+    print("tokenizer ok")
+
+
+if __name__ == "__main__":
+    main()

@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import os
+
 from huggingface_hub import HfApi
 
 
 REPO_ID = "sage002/sage"
+DEFAULT_COMMIT_MESSAGE = "feat: add authenticated remote control UI and ngrok launcher"
 
 
 def main() -> None:
     """Replace the remote Hugging Face repo contents with the local folder state."""
     api = HfApi()
+    commit_message = os.environ.get("HF_COMMIT_MESSAGE", DEFAULT_COMMIT_MESSAGE)
     print(f"Syncing current repository to {REPO_ID}...")
     api.upload_folder(
         folder_path=".",
@@ -31,7 +35,7 @@ def main() -> None:
             "tokenizer/training_corpus.txt",
         ],
         delete_patterns="*",
-        commit_message="feat: rewrite SAGE 1B architecture and replace legacy repo contents",
+        commit_message=commit_message,
     )
     print("Sync complete.")
 

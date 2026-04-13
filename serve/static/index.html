@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAGE Control</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111418;
+      --panel: #1b2026;
+      --panel-border: #2c343d;
+      --text: #e8edf2;
+      --muted: #98a4b3;
+      --accent: #4cc2ff;
+      --good: #3fb950;
+      --bad: #ff6b6b;
+      --warn: #f0b429;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .page {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2 { margin: 0 0 12px; }
+    p { color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 6px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    input, textarea, select, button {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--panel-border);
+      background: #11161c;
+      color: var(--text);
+      padding: 10px 12px;
+      font: inherit;
+    }
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+    .button-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .button-row button { flex: 1; }
+    button {
+      cursor: pointer;
+      background: #18222c;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #031923;
+      border-color: transparent;
+      font-weight: 600;
+    }
+    .jobs {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .job {
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 12px;
+      background: #14191f;
+    }
+    .job-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 1px solid var(--panel-border);
+    }
+    .status-running, .status-completed { color: var(--good); }
+    .status-failed { color: var(--bad); }
+    .status-stopping, .status-stopped { color: var(--warn); }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+    }
+    #logs, #api-result {
+      min-height: 200px;
+      white-space: pre-wrap;
+      background: #0b1015;
+      border-radius: 10px;
+      border: 1px solid var(--panel-border);
+      padding: 12px;
+      overflow: auto;
+    }
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .inline-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .inline-toggle input {
+      width: auto;
+      margin: 0;
+    }
+    .hidden { display: none; }
+    .hint {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>SAGE Remote Control</h1>
+    <p>Plain browser control panel for the local repo. Login first, then run presets or any raw command and watch logs live.</p>
+
+    <section id="login-panel" class="panel">
+      <h2>Login</h2>
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="SAGE_WEB_PASSWORD">
+      <div class="button-row">
+        <button id="login-button" class="primary">Login</button>
+      </div>
+      <div id="login-status" class="hint"></div>
+    </section>
+
+    <div id="app-shell" class="grid hidden">
+      <div>
+        <section class="panel">
+          <h2>Preset Runner</h2>
+          <label for="preset-select">Preset</label>
+          <select id="preset-select"></select>
+          <div id="preset-description" class="hint"></div>
+          <div id="preset-fields" class="field-row"></div>
+          <div class="button-row">
+            <button id="run-preset" class="primary">Run Preset</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Raw Command</h2>
+          <label for="raw-cwd">Working Directory</label>
+          <input id="raw-cwd" type="text">
+          <label for="raw-command">Command</label>
+          <textarea id="raw-command" class="mono" placeholder="python -m train.trainer --help"></textarea>
+          <div class="button-row">
+            <button id="run-raw" class="primary">Run Raw Command</button>
+          </div>
+          <div class="hint">Runs through the host shell. Use this when a preset does not cover your exact command.</div>
+        </section>
+
+        <section class="panel">
+          <h2>API Result</h2>
+          <div id="api-result" class="mono">No API result yet.</div>
+        </section>
+      </div>
+
+      <div>
+        <section class="panel">
+          <h2>Jobs</h2>
+          <div class="button-row">
+            <button id="refresh-jobs">Refresh Jobs</button>
+          </div>
+          <div id="jobs" class="jobs"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Live Log</h2>
+          <div id="selected-job" class="hint">No job selected.</div>
+          <div id="logs" class="mono">Select a job to stream logs.</div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      presets: [],
+      repoRoot: "",
+      selectedJobId: null,
+      stream: null,
+      pollTimer: null,
+    };
+
+    const loginPanel = document.getElementById("login-panel");
+    const loginStatus = document.getElementById("login-status");
+    const appShell = document.getElementById("app-shell");
+    const presetSelect = document.getElementById("preset-select");
+    const presetDescription = document.getElementById("preset-description");
+    const presetFields = document.getElementById("preset-fields");
+    const rawCwd = document.getElementById("raw-cwd");
+    const rawCommand = document.getElementById("raw-command");
+    const jobsEl = document.getElementById("jobs");
+    const logsEl = document.getElementById("logs");
+    const selectedJobEl = document.getElementById("selected-job");
+    const apiResultEl = document.getElementById("api-result");
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        credentials: "same-origin",
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
+      });
+      if (response.status === 401) {
+        showLogin("Authentication required.");
+        throw new Error("Authentication required.");
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || "Request failed.");
+      }
+      return data;
+    }
+
+    function showLogin(message = "") {
+      loginPanel.classList.remove("hidden");
+      appShell.classList.add("hidden");
+      loginStatus.textContent = message;
+    }
+
+    function showApp() {
+      loginPanel.classList.add("hidden");
+      appShell.classList.remove("hidden");
+    }
+
+    function currentPreset() {
+      return state.presets.find((item) => item.id === presetSelect.value);
+    }
+
+    function renderPresetFields() {
+      const preset = currentPreset();
+      presetFields.innerHTML = "";
+      presetDescription.textContent = preset ? preset.description : "";
+      if (!preset) {
+        return;
+      }
+      for (const field of preset.fields) {
+        const wrapper = document.createElement("div");
+        const label = document.createElement("label");
+        label.textContent = field.label;
+        label.htmlFor = `field-${field.name}`;
+        wrapper.appendChild(label);
+
+        let input;
+        if (field.kind === "textarea" || field.kind === "json") {
+          input = document.createElement("textarea");
+          input.value = field.kind === "json" ? JSON.stringify(field.default ?? "", null, 2) : (field.default ?? "");
+        } else if (field.kind === "boolean") {
+          const toggle = document.createElement("div");
+          toggle.className = "inline-toggle";
+          input = document.createElement("input");
+          input.type = "checkbox";
+          input.checked = Boolean(field.default);
+          const span = document.createElement("span");
+          span.textContent = field.label;
+          toggle.appendChild(input);
+          toggle.appendChild(span);
+          wrapper.appendChild(toggle);
+          presetFields.appendChild(wrapper);
+          input.id = `field-${field.name}`;
+          input.dataset.kind = field.kind;
+          input.dataset.name = field.name;
+          continue;
+        } else {
+          input = document.createElement("input");
+          input.type = field.kind === "number" ? "number" : "text";
+          input.value = field.default ?? "";
+        }
+
+        input.id = `field-${field.name}`;
+        input.dataset.kind = field.kind;
+        input.dataset.name = field.name;
+        input.placeholder = field.placeholder || "";
+        wrapper.appendChild(input);
+        presetFields.appendChild(wrapper);
+      }
+    }
+
+    function collectPresetArgs() {
+      const args = {};
+      for (const element of presetFields.querySelectorAll("[data-name]")) {
+        const name = element.dataset.name;
+        const kind = element.dataset.kind;
+        if (kind === "boolean") {
+          args[name] = element.checked;
+        } else if (kind === "number") {
+          args[name] = element.value === "" ? "" : Number(element.value);
+        } else if (kind === "json") {
+          args[name] = element.value.trim() ? JSON.parse(element.value) : null;
+        } else {
+          args[name] = element.value;
+        }
+      }
+      return args;
+    }
+
+    function renderJobs(jobs) {
+      jobsEl.innerHTML = "";
+      if (!jobs.length) {
+        jobsEl.textContent = "No jobs yet.";
+        return;
+      }
+      for (const job of jobs) {
+        const card = document.createElement("div");
+        card.className = "job";
+        const head = document.createElement("div");
+        head.className = "job-head";
+        const title = document.createElement("div");
+        title.innerHTML = `<strong>${job.label}</strong><div class="hint mono">${job.command}</div>`;
+        const badge = document.createElement("span");
+        badge.className = `badge status-${job.status}`;
+        badge.textContent = job.status;
+        head.appendChild(title);
+        head.appendChild(badge);
+        card.appendChild(head);
+
+        const meta = document.createElement("div");
+        meta.className = "hint mono";
+        meta.textContent = `${job.cwd} | logs=${job.log_lines}` + (job.exit_code !== null ? ` | exit=${job.exit_code}` : "");
+        card.appendChild(meta);
+
+        const buttons = document.createElement("div");
+        buttons.className = "button-row";
+
+        const selectButton = document.createElement("button");
+        selectButton.textContent = "View Logs";
+        selectButton.onclick = () => selectJob(job.id);
+        buttons.appendChild(selectButton);
+
+        const stopButton = document.createElement("button");
+        stopButton.textContent = "Stop";
+        stopButton.disabled = !["running", "stopping"].includes(job.status);
+        stopButton.onclick = async () => {
+          try {
+            await api(`/api/jobs/${job.id}/stop`, { method: "POST", body: "{}" });
+            await refreshJobs();
+          } catch (error) {
+            apiResultEl.textContent = String(error);
+          }
+        };
+        buttons.appendChild(stopButton);
+        card.appendChild(buttons);
+
+        jobsEl.appendChild(card);
+      }
+    }
+
+    async function refreshJobs() {
+      const payload = await api("/api/jobs");
+      renderJobs(payload.jobs || []);
+    }
+
+    function appendLog(line) {
+      if (!line) {
+        return;
+      }
+      logsEl.textContent += (logsEl.textContent ? "\n" : "") + line;
+      logsEl.scrollTop = logsEl.scrollHeight;
+    }
+
+    async function selectJob(jobId) {
+      state.selectedJobId = jobId;
+      if (state.stream) {
+        state.stream.close();
+      }
+      const payload = await api(`/api/jobs/${jobId}`);
+      selectedJobEl.textContent = `${payload.job.label} | ${payload.job.command}`;
+      logsEl.textContent = (payload.logs || []).join("\n");
+      state.stream = new EventSource(`/api/jobs/${jobId}/stream`);
+      state.stream.addEventListener("log", (event) => {
+        const data = JSON.parse(event.data);
+        appendLog(data.line);
+      });
+      state.stream.addEventListener("status", (event) => {
+        const data = JSON.parse(event.data);
+        appendLog(`[status] ${JSON.stringify(data)}`);
+        refreshJobs().catch(() => {});
+      });
+      state.stream.onerror = () => {
+        appendLog("[stream] disconnected");
+      };
+    }
+
+    async function loadPresets() {
+      const payload = await api("/api/commands/presets");
+      state.presets = payload.presets || [];
+      state.repoRoot = payload.repo_root || "";
+      rawCwd.value = state.repoRoot;
+      presetSelect.innerHTML = "";
+      for (const preset of state.presets) {
+        const option = document.createElement("option");
+        option.value = preset.id;
+        option.textContent = preset.label;
+        presetSelect.appendChild(option);
+      }
+      renderPresetFields();
+    }
+
+    async function login() {
+      const password = document.getElementById("password").value;
+      try {
+        await api("/api/login", {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        });
+        showApp();
+        await loadPresets();
+        await refreshJobs();
+        if (state.pollTimer) {
+          clearInterval(state.pollTimer);
+        }
+        state.pollTimer = setInterval(() => refreshJobs().catch(() => {}), 4000);
+      } catch (error) {
+        loginStatus.textContent = String(error.message || error);
+      }
+    }
+
+    document.getElementById("login-button").addEventListener("click", login);
+    presetSelect.addEventListener("change", renderPresetFields);
+    document.getElementById("refresh-jobs").addEventListener("click", () => refreshJobs().catch((error) => {
+      apiResultEl.textContent = String(error.message || error);
+    }));
+    document.getElementById("run-preset").addEventListener("click", async () => {
+      const preset = currentPreset();
+      if (!preset) {
+        return;
+      }
+      try {
+        const payload = await api("/api/commands/run", {
+          method: "POST",
+          body: JSON.stringify({ preset_id: preset.id, args: collectPresetArgs() }),
+        });
+        if (payload.kind === "api") {
+          apiResultEl.textContent = JSON.stringify(payload.result, null, 2);
+          return;
+        }
+        apiResultEl.textContent = JSON.stringify(payload.job, null, 2);
+        await refreshJobs();
+        await selectJob(payload.job.id);
+      } catch (error) {
+        apiResultEl.textContent = String(error.message || error);
+      }
+    });
+    document.getElementById("run-raw").addEventListener("click", async () => {
+      try {
+        const payload = await api("/api/commands/run", {
+          method: "POST",
+          body: JSON.stringify({ command: rawCommand.value, cwd: rawCwd.value }),
+        });
+        apiResultEl.textContent = JSON.stringify(payload.job, null, 2);
+        await refreshJobs();
+        await selectJob(payload.job.id);
+      } catch (error) {
+        apiResultEl.textContent = String(error.message || error);
+      }
+    });
+
+    loadPresets().then(() => {
+      showApp();
+      refreshJobs().catch(() => showLogin(""));
+    }).catch(() => showLogin("Enter the control password."));
+  </script>
+</body>
+</html>

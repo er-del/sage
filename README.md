@@ -88,6 +88,16 @@ python sage_single.py
 ### Basic Chat
 Once launched, simply type your message to chat with SAGE. The system uses a rolling conversation history to maintain context.
 
+### Browser Control UI
+The FastAPI server now serves a minimal remote control panel at `/`.
+
+```bash
+export SAGE_WEB_PASSWORD=change-me
+python -m uvicorn serve.server:app --host 0.0.0.0 --port 8000
+```
+
+Open the server root in a browser, log in with `SAGE_WEB_PASSWORD`, and use preset actions or a raw command box to drive the local repo from the UI. The included `test.ipynb` notebook starts the real app and exposes it through ngrok for Colab.
+
 ---
 
 ## 👨‍🏫 Training SAGE

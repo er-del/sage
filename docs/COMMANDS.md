@@ -60,14 +60,18 @@ bash scripts/run_eval.sh
 ## Start GPU server
 
 ```bash
+export SAGE_WEB_PASSWORD=change-me
 bash scripts/run_serve.sh
 ```
 
 ## Start CPU server
 
 ```bash
+export SAGE_WEB_PASSWORD=change-me
 bash scripts/run_serve_cpu.sh
 ```
+
+The server root now hosts the browser control panel at `/`. Log in with `SAGE_WEB_PASSWORD`, then use presets or raw commands from the UI.
 
 ## Check server health
 

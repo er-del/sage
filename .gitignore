@@ -77,6 +77,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.nbconvert.ipynb
 
 # IPython
 profile_default/
@@ -116,5 +117,11 @@ checkpoints/
 .venv/
 .env
 .DS_Store
+logs/
+runtime/
+tmp/
+uvicorn.log
+ngrok.log
+*.ngrok.log
 not for your use/
 Sage_v1.0/

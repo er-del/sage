@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from model.config import ModelConfig
 from model.model import SageTransformer
+from serve.control_plane import build_control_router
 from serve.kv_cache import KVCache
 from train.hardware import HardwareConfig
 
@@ -57,3 +58,18 @@ def generate(request: GenerationRequest) -> dict[str, object]:
         generated.append(next_token)
         input_ids = torch.tensor([[next_token]], dtype=torch.long, device=device)
     return {"tokens": generated}
+
+
+def _health_action(_: dict[str, object]) -> dict[str, object]:
+    return health()
+
+
+def _generate_action(args: dict[str, object]) -> dict[str, object]:
+    request = GenerationRequest(
+        input_ids=[int(item) for item in list(args.get("input_ids", []))],
+        max_new_tokens=int(args.get("max_new_tokens", 32)),
+    )
+    return generate(request)
+
+
+app.include_router(build_control_router({"health_check": _health_action, "generate": _generate_action}))
