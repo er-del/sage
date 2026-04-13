@@ -73,17 +73,21 @@ from sage import __version__ as sage_version
 print(f"✅ SAGE v{sage_version} loaded successfully")
 
 # -- Initialization --
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-config = SageConfig() 
+config = SageConfig()
+# Note: config.device automatically checks GPU compatibility and falls back to CPU if needed
+device = config.device
+print(f"🖥️  Using device: {device}")
+
 tokenizer = SageTokenizer()
 history = ConversationHistory(tokenizer, max_tokens=1024)
 model = SageModel(config)
 
-# -- Multi-GPU Logic --
-gpu_count = torch.cuda.device_count()
-if gpu_count > 1:
-    print(f"🚀 Multi-GPU active: {gpu_count} GPUs.")
-    model = nn.DataParallel(model)
+# -- Multi-GPU Logic (only if CUDA is actually being used) --
+if device.type == "cuda":
+    gpu_count = torch.cuda.device_count()
+    if gpu_count > 1:
+        print(f"🚀 Multi-GPU active: {gpu_count} GPUs.")
+        model = nn.DataParallel(model)
 model = model.to(device)
 
 # -- Load Weights --
