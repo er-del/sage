@@ -618,19 +618,40 @@ def _embed(text, tokenizer, model, device):
 
 class VectorStore:
     def __init__(self, dim):
-        import faiss
-        self.dim = dim; self.index = faiss.IndexFlatIP(dim); self.docs = []
+        self.dim = dim; self.docs = []; self.index = None
+        try:
+            import faiss
+            self.index = faiss.IndexFlatIP(dim)
+        except ImportError:
+            logger.warning("FAISS not installed. RAG will use brute-force search.")
 
     def add(self, texts, embeddings):
-        self.index.add(embeddings.astype(np.float32)); self.docs.extend(texts)
+        if self.index is not None:
+            self.index.add(embeddings.astype(np.float32))
+        else:
+            # Brute-force fallback
+            if not hasattr(self, '_embeddings'):
+                self._embeddings = []
+            self._embeddings.extend(embeddings.astype(np.float32))
+        self.docs.extend(texts)
 
     def search(self, qemb, k=3):
-        if not self.index.ntotal: return []
-        scores, idx = self.index.search(qemb.reshape(1, -1).astype(np.float32), min(k, self.index.ntotal))
-        return [(self.docs[i], float(s)) for s, i in zip(scores[0], idx[0]) if i >= 0]
+        if not self.docs: return []
+        k = min(k, len(self.docs))
+        if self.index is not None:
+            scores, idx = self.index.search(qemb.reshape(1, -1).astype(np.float32), k)
+            return [(self.docs[i], float(s)) for s, i in zip(scores[0], idx[0]) if i >= 0]
+        else:
+            # Brute-force cosine similarity
+            import numpy as np
+            qemb = qemb.reshape(1, -1).astype(np.float32)
+            embs = np.array(self._embeddings)
+            sims = np.dot(embs, qemb.T).flatten()
+            top_k = np.argsort(sims)[-k:][::-1]
+            return [(self.docs[i], float(sims[i])) for i in top_k]
 
     @property
-    def size(self): return self.index.ntotal
+    def size(self): return len(self.docs)
 
 class RAGManager:
     def __init__(self, model, tokenizer, device, chunk_size=200):
