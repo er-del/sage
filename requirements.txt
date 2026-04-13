@@ -1,9 +1,27 @@
-torch>=2.0.0
+# SAGE - Self-Adaptive General Engine
+# ======================================
+# Core dependencies
+
+# PyTorch - GPU compatibility notes:
+# - For Tesla P100 (sm_60), V100, T4, A100: torch>=2.1.0
+# - For older GPUs (sm_60): use torch==2.1.0 --index-url https://download.pytorch.org/whl/cu121
+# - The code auto-detects GPU compatibility and falls back to CPU if needed
+torch>=2.1.0
+
+# Tokenization & Data
 tiktoken>=0.5.1
 datasets>=2.14.0
+
+# Vector search (for RAG)
 faiss-cpu>=1.7.4
+
+# Utilities
 tqdm>=4.66.1
-bitsandbytes>=0.41.0
 numpy<2.0.0
+
+# Quantization (optional GPU support)
+bitsandbytes>=0.41.0
+
+# Model Hub & Experiment Tracking
 huggingface_hub>=0.20.0
 wandb>=0.16.0
