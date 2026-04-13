@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+wandb/
+
 # C extensions
 *.so
 
@@ -25,8 +27,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-hf_push.py
-.hugging_face_ignore
 
 # PyInstaller
 #  Usually these files are written by a python script, before a-one-file pack
@@ -112,6 +112,12 @@ celerybeat.pid
 
 # Sage Project Specific
 checkpoints/
+runs/
+tokenizer/*.model
+tokenizer/*.vocab
+tokenizer/training_corpus.txt
+data/raw/
+data/processed/
 .venv/
 .env
 .DS_Store

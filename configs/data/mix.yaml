@@ -1,0 +1,25 @@
+data_sources:
+  general_web:
+    weight_percent: 55
+    quality_tiers: [high, medium]
+  code:
+    weight_percent: 15
+    quality_tiers: [high, medium]
+  math_science:
+    weight_percent: 12
+    quality_tiers: [high, medium]
+  books_longform:
+    weight_percent: 10
+    quality_tiers: [high, medium]
+  multilingual:
+    weight_percent: 5
+    quality_tiers: [high, medium]
+  synthetic:
+    weight_percent: 3
+    quality_tiers: [high]
+splits:
+  train: 0.989
+  validation: 0.01
+  test: 0.001
+shard_size_bytes: 2147483648
+format: parquet

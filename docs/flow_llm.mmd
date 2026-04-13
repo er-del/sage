@@ -1,0 +1,140 @@
+flowchart TB
+
+    %% =========================================================
+    %% SAGE - Simplified Operational Flow
+    %% This file is pure Mermaid so .mmd renderers can open it.
+    %% =========================================================
+
+    user["You / Operator"]
+
+    subgraph inputs["Inputs"]
+        raw["Raw text / JSONL corpus"]
+        cfg_model["configs/model/1b.yaml"]
+        cfg_train["configs/train/schedule.yaml"]
+        cfg_data["configs/data/mix.yaml"]
+    end
+
+    subgraph tokenizer["Tokenizer Stage"]
+        tok_train["tokenizer/train_tokenizer.py"]
+        tok_validate["tokenizer/validate_tokenizer.py"]
+        tok_model["tokenizer.model + tokenizer.vocab"]
+    end
+
+    subgraph prep["Data Preparation Stage"]
+        ingest["data/ingest.py"]
+        filter["data/filter.py"]
+        dedup["data/dedup.py"]
+        shard["data/shard.py"]
+        parquet["Parquet shards + manifest.json"]
+        packed["data/dataset.py<br/>PackedDataset"]
+    end
+
+    subgraph model["Model Stage"]
+        model_cfg["model/config.py"]
+        rms["RMSNorm"]
+        rope["RoPE"]
+        attn["GQA Attention + SDPA"]
+        mlp["SwiGLU MLP"]
+        blocks["Transformer Blocks x24"]
+        sage["SageTransformer"]
+    end
+
+    subgraph train["Training Stage"]
+        hw["train/hardware.py"]
+        opt["train/optimizer.py"]
+        loss["train/loss.py"]
+        ckpt["train/checkpoint.py"]
+        trainer["train/trainer.py"]
+        metrics["runs/<name>/metrics.jsonl"]
+        saves["runs/<name>/ckpt_step_xxxxxxx.pt"]
+    end
+
+    subgraph evals["Evaluation Stage"]
+        ppl["eval/perplexity.py"]
+        bench["eval/benchmarks.py"]
+        longctx["eval/long_context.py"]
+        regress["eval/regression.py"]
+    end
+
+    subgraph serving["Serving Stage"]
+        kv["serve/kv_cache.py"]
+        quant["serve/quantize.py"]
+        api["serve/server.py"]
+        cpu["serve/server_cpu.py"]
+        health["/health"]
+        generate["/generate"]
+    end
+
+    user --> raw
+    user --> cfg_model
+    user --> cfg_train
+    user --> cfg_data
+
+    raw --> tok_train
+    tok_train --> tok_model
+    tok_model --> tok_validate
+
+    raw --> ingest
+    cfg_data --> ingest
+    ingest --> filter
+    filter --> dedup
+    dedup --> shard
+    tok_model --> shard
+    shard --> parquet
+    parquet --> packed
+
+    cfg_model --> model_cfg
+    model_cfg --> rms
+    model_cfg --> rope
+    model_cfg --> attn
+    model_cfg --> mlp
+    rms --> blocks
+    rope --> attn
+    attn --> blocks
+    mlp --> blocks
+    blocks --> sage
+
+    packed --> trainer
+    cfg_train --> trainer
+    cfg_model --> trainer
+    hw --> trainer
+    opt --> trainer
+    loss --> trainer
+    ckpt --> trainer
+    sage --> trainer
+
+    trainer --> metrics
+    trainer --> saves
+    trainer --> ppl
+
+    sage --> ppl
+    sage --> bench
+    sage --> longctx
+    ppl --> regress
+    bench --> regress
+    longctx --> regress
+
+    sage --> kv
+    sage --> quant
+    sage --> api
+    quant --> cpu
+    kv --> api
+    api --> health
+    api --> generate
+    cpu --> health
+
+    classDef input fill:#0f172a,stroke:#93c5fd,color:#ffffff
+    classDef token fill:#1d4ed8,stroke:#bfdbfe,color:#ffffff
+    classDef prep fill:#0f766e,stroke:#99f6e4,color:#ffffff
+    classDef model fill:#581c87,stroke:#d8b4fe,color:#ffffff
+    classDef train fill:#92400e,stroke:#fde68a,color:#ffffff
+    classDef eval fill:#991b1b,stroke:#fecaca,color:#ffffff
+    classDef serve fill:#166534,stroke:#bbf7d0,color:#ffffff
+
+    class user,raw,cfg_model,cfg_train,cfg_data input
+    class tok_train,tok_validate,tok_model token
+    class ingest,filter,dedup,shard,parquet,packed prep
+    class model_cfg,rms,rope,attn,mlp,blocks,sage model
+    class hw,opt,loss,ckpt,trainer,metrics,saves train
+    class ppl,bench,longctx,regress eval
+    class kv,quant,api,cpu,health,generate serve

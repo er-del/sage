@@ -1,0 +1,202 @@
+---
+title: SAGE 1B System Architecture
+---
+flowchart TB
+
+    %% =========================================================
+    %% SAGE 1B - End-to-End Architecture and Flow Overview
+    %% =========================================================
+
+    user["Developer / Operator"]
+
+    subgraph repo["SAGE Repository"]
+        direction TB
+
+        subgraph configs["configs/"]
+            cfg_model["model/1b.yaml<br/>24L, 2048 d_model, 16Q / 8KV, 4096 ctx"]
+            cfg_data["data/mix.yaml<br/>corpus weights + split ratios"]
+            cfg_train["train/schedule.yaml<br/>LR, warmup, checkpoints, logging"]
+        end
+
+        subgraph tokenizer["tokenizer/"]
+            tok_train["train_tokenizer.py<br/>SentencePiece BPE training"]
+            tok_validate["validate_tokenizer.py<br/>roundtrip + edge-case checks"]
+            tok_model["tokenizer.model / tokenizer.vocab"]
+        end
+
+        subgraph data_layer["data/"]
+            ingest["ingest.py<br/>source registry + raw record streaming"]
+            filter["filter.py<br/>license, lang, PII, safety, quality"]
+            dedup["dedup.py<br/>exact + near-duplicate removal"]
+            shard["shard.py<br/>tokenize -> parquet shards + manifest"]
+            dataset["dataset.py<br/>PackedDataset + skip(n_batches)"]
+        end
+
+        subgraph model_layer["model/"]
+            model_cfg["config.py<br/>ModelConfig"]
+            rmsnorm["rmsnorm.py<br/>pre-norm RMSNorm"]
+            rope["rope.py<br/>RoPE cache + apply_rope"]
+            attn["attention.py<br/>fused QKV + GQA + SDPA"]
+            mlp["mlp.py<br/>SwiGLU FFN"]
+            block["block.py<br/>Transformer block"]
+            full_model["model.py<br/>SageTransformer"]
+        end
+
+        subgraph train_layer["train/"]
+            hw["hardware.py<br/>device / dtype / batch routing"]
+            dist["distributed.py<br/>single / DDP / FSDP strategy"]
+            opt["optimizer.py<br/>AdamW + cosine schedule"]
+            loss["loss.py<br/>masked next-token cross entropy"]
+            ckpt["checkpoint.py<br/>save / prune / resume"]
+            trainer["trainer.py<br/>main training loop"]
+        end
+
+        subgraph eval_layer["eval/"]
+            ppl["perplexity.py<br/>validation loss + perplexity"]
+            benches["benchmarks.py<br/>benchmark harness registry"]
+            longctx["long_context.py<br/>needle-in-haystack probes"]
+            regress["regression.py<br/>checkpoint metric comparison"]
+        end
+
+        subgraph serve_layer["serve/"]
+            kv["kv_cache.py<br/>cache container"]
+            quant["quantize.py<br/>int8 export + GGUF command helper"]
+            gpu_api["server.py<br/>FastAPI GPU server"]
+            cpu_api["server_cpu.py<br/>FastAPI CPU readiness surface"]
+        end
+
+        subgraph scripts["scripts/"]
+            s_data["run_data_pipeline.sh"]
+            s_train["run_training.sh"]
+            s_eval["run_eval.sh"]
+            s_serve["run_serve.sh / run_serve_cpu.sh"]
+        end
+
+        subgraph outputs["Runtime Outputs"]
+            raw["Raw text / JSONL corpora"]
+            parquet["Parquet shards + manifest.json"]
+            runs["runs/<name>/metrics.jsonl"]
+            checkpoints["runs/<name>/ckpt_step_xxxxxxx.pt"]
+            api_out["/health + /generate responses"]
+        end
+    end
+
+    %% =========================================================
+    %% Top-level usage
+    %% =========================================================
+
+    user --> s_data
+    user --> s_train
+    user --> s_eval
+    user --> s_serve
+
+    s_data --> tok_train
+    s_train --> trainer
+    s_eval --> benches
+    s_serve --> gpu_api
+    s_serve --> cpu_api
+
+    %% =========================================================
+    %% Tokenizer flow
+    %% =========================================================
+
+    raw --> tok_train
+    tok_train --> tok_model
+    tok_model --> tok_validate
+
+    %% =========================================================
+    %% Data preparation flow
+    %% =========================================================
+
+    raw --> ingest
+    ingest --> filter
+    filter --> dedup
+    dedup --> shard
+    tok_model --> shard
+    shard --> parquet
+    parquet --> dataset
+
+    cfg_data --> ingest
+    cfg_data --> filter
+    cfg_data --> shard
+
+    %% =========================================================
+    %% Model construction flow
+    %% =========================================================
+
+    cfg_model --> model_cfg
+    model_cfg --> rmsnorm
+    model_cfg --> rope
+    model_cfg --> attn
+    model_cfg --> mlp
+    rmsnorm --> block
+    rope --> attn
+    attn --> block
+    mlp --> block
+    block --> full_model
+
+    %% =========================================================
+    %% Training flow
+    %% =========================================================
+
+    cfg_train --> opt
+    cfg_train --> trainer
+    cfg_train --> ckpt
+    model_cfg --> full_model
+    dataset --> trainer
+    full_model --> trainer
+    hw --> trainer
+    dist --> trainer
+    opt --> trainer
+    loss --> trainer
+    ckpt --> trainer
+
+    trainer --> runs
+    trainer --> checkpoints
+    trainer --> ppl
+
+    %% =========================================================
+    %% Evaluation flow
+    %% =========================================================
+
+    full_model --> ppl
+    full_model --> benches
+    full_model --> longctx
+    ppl --> regress
+    benches --> regress
+    longctx --> regress
+
+    %% =========================================================
+    %% Serving flow
+    %% =========================================================
+
+    full_model --> kv
+    full_model --> quant
+    full_model --> gpu_api
+    quant --> cpu_api
+    kv --> gpu_api
+    hw --> gpu_api
+    gpu_api --> api_out
+    cpu_api --> api_out
+
+    %% =========================================================
+    %% Visual grouping
+    %% =========================================================
+
+    classDef config fill:#1f2937,stroke:#93c5fd,color:#ffffff
+    classDef pipeline fill:#0f766e,stroke:#5eead4,color:#ffffff
+    classDef model fill:#4c1d95,stroke:#c4b5fd,color:#ffffff
+    classDef train fill:#92400e,stroke:#fcd34d,color:#ffffff
+    classDef eval fill:#7f1d1d,stroke:#fca5a5,color:#ffffff
+    classDef serve fill:#065f46,stroke:#86efac,color:#ffffff
+    classDef io fill:#111827,stroke:#9ca3af,color:#ffffff
+    classDef actor fill:#2563eb,stroke:#bfdbfe,color:#ffffff
+
+    class user actor
+    class cfg_model,cfg_data,cfg_train config
+    class tok_train,tok_validate,ingest,filter,dedup,shard,dataset pipeline
+    class model_cfg,rmsnorm,rope,attn,mlp,block,full_model model
+    class hw,dist,opt,loss,ckpt,trainer train
+    class ppl,benches,longctx,regress eval
+    class kv,quant,gpu_api,cpu_api serve
+    class raw,parquet,runs,checkpoints,api_out,tok_model,s_data,s_train,s_eval,s_serve io

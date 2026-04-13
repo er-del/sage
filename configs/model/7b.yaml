@@ -1,0 +1,13 @@
+name: sage-7b
+num_layers: 32
+d_model: 4096
+num_attn_heads: 32
+num_kv_heads: 8
+head_dim: 128
+ffn_hidden_dim: 11008
+vocab_size: 50000
+context_length: 8192
+rope_base_frequency: 500000
+rope_scaling_factor: 1.0
+dropout: 0.0
+tie_word_embeddings: true

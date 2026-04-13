@@ -1,0 +1,1 @@
+"""Model architecture for SAGE."""
