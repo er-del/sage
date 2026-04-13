@@ -50,11 +50,27 @@ This is a premium, multi-GPU enabled chat widget. Paste this into a cell to star
 **Note:** SAGE automatically detects GPU compatibility and falls back to CPU if needed.
 
 ```python
-import torch, os, random
+import sys, os, torch, random
 import torch.nn as nn
 import ipywidgets as widgets
 from IPython.display import display, HTML
+
+# Verify SAGE is accessible (debugging import issues)
+if not os.path.exists('sage/__init__.py'):
+    print("❌ ERROR: sage/ folder not found in current directory!")
+    print("   Make sure you've cloned the repo: !git clone https://github.com/er-del/sage.git")
+    raise ImportError("sage module not found")
+
+# Add current directory to path if needed
+if '' not in sys.path and '.' not in sys.path:
+    sys.path.insert(0, '')
+
+# Import SAGE
 from sage import SageModel, SageConfig, SageTokenizer, generate, ConversationHistory, train as train_model, finetune
+from sage import __version__ as sage_version
+
+# Verify import worked
+print(f"✅ SAGE v{sage_version} loaded successfully")
 
 # -- Initialization --
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
