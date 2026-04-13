@@ -1,0 +1,22 @@
+{
+  "include": [
+    "data",
+    "eval",
+    "model",
+    "serve",
+    "tests",
+    "tokenizer",
+    "train"
+  ],
+  "extraPaths": [
+    "."
+  ],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": [
+        "."
+      ]
+    }
+  ]
+}

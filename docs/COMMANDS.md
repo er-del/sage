@@ -20,7 +20,7 @@ pytest -q
 python -m tokenizer.train_tokenizer \
   --input data/raw/general_web.txt data/raw/code.txt \
   --model-prefix tokenizer/tokenizer \
-  --vocab-size 50000
+  --model-prefix tokenizer/tokenizer \
 ```
 
 ## Validate tokenizer

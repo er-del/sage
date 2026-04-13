@@ -27,7 +27,7 @@ def evaluate_perplexity(
         labels = batch["labels"].to(device)
         loss_mask = batch["loss_mask"].to(device)
         if dtype is not None and device.type != "cpu":
-            with torch.amp.autocast(device_type=device.type, dtype=dtype):
+            with torch.autocast(device_type=device.type, dtype=dtype):
                 logits, _ = model(input_ids)
                 loss = masked_cross_entropy(logits, labels, loss_mask)
         else:

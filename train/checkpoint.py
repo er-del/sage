@@ -5,7 +5,6 @@ from __future__ import annotations
 import glob
 import os
 from pathlib import Path
-from typing import Any
 
 import torch
 
@@ -14,9 +13,9 @@ def save_checkpoint(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LambdaLR,
-    scaler: torch.amp.GradScaler | None,
+    scaler: torch.GradScaler | None,
     step: int,
-    config: dict[str, Any],
+    config: dict[str, object],
     output_dir: str,
     keep: int = 5,
 ) -> str:
@@ -44,7 +43,7 @@ def load_latest_checkpoint(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer | None,
     scheduler: torch.optim.lr_scheduler.LambdaLR | None,
-    scaler: torch.amp.GradScaler | None,
+    scaler: torch.GradScaler | None,
     output_dir: str,
     device: str | torch.device,
 ) -> int:

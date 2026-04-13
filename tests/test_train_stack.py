@@ -24,7 +24,7 @@ def test_checkpoint_roundtrip(tmp_path: Path) -> None:
     schedule = ScheduleConfig(total_steps=8)
     optimizer = create_optimizer(model, schedule)
     scheduler = create_scheduler(optimizer, schedule)
-    scaler = torch.amp.GradScaler("cuda", enabled=False)
+    scaler = torch.GradScaler("cuda", enabled=False)
     path = save_checkpoint(model, optimizer, scheduler, scaler, 3, {"name": "test"}, str(tmp_path))
     assert Path(path).exists()
     resumed_step = load_latest_checkpoint(model, optimizer, scheduler, scaler, str(tmp_path), "cpu")

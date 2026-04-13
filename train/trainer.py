@@ -64,7 +64,7 @@ def train(
     model = model.to(device)
     optimizer = create_optimizer(model, schedule_config)
     scheduler = create_scheduler(optimizer, schedule_config)
-    scaler = torch.amp.GradScaler("cuda", enabled=(hw.device == "cuda" and hw.dtype == torch.float16))
+    scaler = torch.GradScaler("cuda", enabled=(hw.device == "cuda" and hw.dtype == torch.float16))
     start_step = load_latest_checkpoint(model, optimizer, scheduler, scaler, trainer_config.output_dir, device)
     train_dataset.skip(start_step * hw.grad_accum)
     train_loader = create_dataloader(train_dataset, batch_size=hw.micro_batch)
@@ -90,7 +90,7 @@ def train(
             labels = batch["labels"].to(device)
             loss_mask = batch["loss_mask"].to(device)
             if hw.use_amp:
-                with torch.amp.autocast(device_type=hw.device, dtype=hw.dtype):
+                with torch.autocast(device_type=hw.device, dtype=hw.dtype):
                     logits, _ = model(input_ids)
                     loss = masked_cross_entropy(logits, labels, loss_mask) / hw.grad_accum
             else:
