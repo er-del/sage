@@ -35,10 +35,22 @@ def get_compatible_device() -> torch.device:
         logger.info(f"Detected GPU: {gpu_name} (CUDA Capability: {sm_version})")
         
         # PyTorch 2.0+ minimum is sm_70, PyTorch 1.13 supports sm_60
-        # Check if we can actually run a small operation
+        # Check if we can actually run model operations (embedding, linear, etc.)
         try:
-            test_tensor = torch.zeros(1).cuda()
-            _ = test_tensor + test_tensor  # Simple operation to verify
+            # Test 1: Basic tensor operation
+            test_tensor = torch.zeros(2, 4).cuda()
+            _ = test_tensor + test_tensor
+            
+            # Test 2: Embedding (this is where P100/sm_60 often fails)
+            import torch.nn as nn
+            test_emb = nn.Embedding(10, 8).cuda()
+            test_indices = torch.tensor([0, 1, 2], dtype=torch.long).cuda()
+            _ = test_emb(test_indices)
+            
+            # Test 3: Linear layer
+            test_linear = nn.Linear(8, 4).cuda()
+            _ = test_linear(test_emb(test_indices))
+            
             logger.info(f"✅ GPU is compatible with current PyTorch")
             return torch.device("cuda")
         except RuntimeError as e:
