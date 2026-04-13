@@ -12,3 +12,4 @@ from .inference import generate
 from .memory import ConversationHistory, RAGManager
 from .train import train
 from .finetune import finetune_instruction as finetune
+from .utils import get_compatible_device

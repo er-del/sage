@@ -1,6 +1,6 @@
 import os
-from dataclasses import dataclass
-import torch
+from dataclasses import dataclass, field
+from typing import Any
 
 @dataclass
 class SageConfig:
@@ -35,12 +35,14 @@ class SageConfig:
     checkpoint_dir: str = "checkpoints"
     project_name: str = "sage-v2"
     
+    # Cache for device (set on first access)
+    _device: Any = field(default=None, repr=False)
+    
     @property
     def device(self):
-        """Returns the best available device."""
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        # For M1/M2 Mac compatibility if someone tries
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
+        """Returns the best available device with CUDA compatibility checking."""
+        if self._device is None:
+            # Import here to avoid circular imports
+            from .utils import get_compatible_device
+            self._device = get_compatible_device()
+        return self._device

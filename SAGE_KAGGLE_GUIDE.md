@@ -5,22 +5,26 @@ Welcome to the **Self-Adaptive General Engine (SAGE)**. This guide will help you
 ---
 
 ## 🛠️ Step 1: Environment Setup
+
 Run this cell first to install dependencies and fix any common binary incompatibilities (like the Numpy/Torch mismatch).
 
 ```python
-# Install Core Dependencies
+# Install PyTorch 2.1 with CUDA 12.1 (supports Tesla P100 sm_60)
+!pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121
+
+# Install other dependencies
 !pip install "numpy<2.0.0" --force-reinstall
 !pip install bitsandbytes tqdm tiktoken faiss-cpu datasets wandb --upgrade
 
-# Install SAGE v2 directly from the codebase
-# (Assuming you have cloned the repo or uploaded sage_single.py)
 print("✅ Environment ready. Please RESTART YOUR KERNEL now if this is your first run.")
 ```
 
 ---
 
 ## 🔑 Step 2: Weights & Biases Logging (Optional but Recommended)
+
 To track your training progress with professional charts:
+
 1. Get your API Key from [wandb.ai/authorize](https://wandb.ai/authorize).
 2. Add it to your Kaggle **Secrets** with the label `WANDB_API_KEY`.
 3. Run this:
@@ -40,14 +44,17 @@ except:
 ---
 
 ## 💬 Step 3: Launch the SAGE Chat Interface
+
 This is a premium, multi-GPU enabled chat widget. Paste this into a cell to start interacting with SAGE.
+
+**Note:** SAGE automatically detects GPU compatibility and falls back to CPU if needed.
 
 ```python
 import torch, os, random
 import torch.nn as nn
 import ipywidgets as widgets
 from IPython.display import display, HTML
-from sage_single import SageModel, SageConfig, SageTokenizer, generate, ConversationHistory, train_model, finetune
+from sage import SageModel, SageConfig, SageTokenizer, generate, ConversationHistory, train as train_model, finetune
 
 # -- Initialization --
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -103,15 +110,17 @@ display(chat_display, widgets.HBox([text_input, send_button]))
 ---
 
 ## 🎮 Command Cheat Sheet
+
 | Command | Action |
 | :--- | :--- |
 | `/train <steps>` | Starts pre-training (Base knowledge). Recommended: 5000+ |
 | `/clear` | Resets the conversation history. |
-| `/finetune <steps>`| (Coming Soon) Starts instruction fine-tuning. |
+| `/finetune <steps>` | (Coming Soon) Starts instruction fine-tuning. |
 
 ---
 
 ## 💡 Pro Tips for T4 GPUs
-1. **Batch Size**: The default `batch_size=4` with `gradient_accumulation=16` is perfect for a 2x T4 setup (32GB VRAM total). 
+
+1. **Batch Size**: The default `batch_size=4` with `gradient_accumulation=16` is perfect for a 2x T4 setup (32GB VRAM total).
 2. **Persistence**: Kaggle outputs are deleted when the session ends. Make sure to **download** the `checkpoints/` folder or sync it to **Hugging Face** regularly.
 3. **Patience**: Loss will fluctuate. Look for a steady downward trend on your W&B dashboard!
