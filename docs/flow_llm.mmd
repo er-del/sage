@@ -1,140 +1,166 @@
-flowchart TB
+---
+title: SAGE — End-to-End Operational Flow
+---
+flowchart LR
 
     %% =========================================================
-    %% SAGE - Simplified Operational Flow
-    %% This file is pure Mermaid so .mmd renderers can open it.
+    %% SAGE Operational Flow — Stage by Stage
+    %% Left-to-right: raw input → trained model → live serving
     %% =========================================================
 
-    user["You / Operator"]
+    actor["👤 Operator"]
 
-    subgraph inputs["Inputs"]
-        raw["Raw text / JSONL corpus"]
-        cfg_model["configs/model/1b.yaml"]
-        cfg_train["configs/train/schedule.yaml"]
-        cfg_data["configs/data/mix.yaml"]
+    subgraph stage0["📥 Stage 0 — Inputs"]
+        raw["Raw Text / JSONL
+        data/raw/*.jsonl"]
+        cfg_m["configs/model/1b.yaml
+        architecture params"]
+        cfg_t["configs/train/schedule.yaml
+        LR · warmup · ckpts"]
     end
 
-    subgraph tokenizer["Tokenizer Stage"]
-        tok_train["tokenizer/train_tokenizer.py"]
-        tok_validate["tokenizer/validate_tokenizer.py"]
-        tok_model["tokenizer.model + tokenizer.vocab"]
+    subgraph stage1["🔤 Stage 1 — Tokenizer"]
+        direction TB
+        tok_train_s["train_tokenizer.py
+        SentencePiece BPE"]
+        tok_model_s[("tokenizer.model
+        vocab_size = 50k")]
+        tok_val_s["validate_tokenizer.py
+        roundtrip checks"]
+        tok_train_s --> tok_model_s --> tok_val_s
     end
 
-    subgraph prep["Data Preparation Stage"]
-        ingest["data/ingest.py"]
-        filter["data/filter.py"]
-        dedup["data/dedup.py"]
-        shard["data/shard.py"]
-        parquet["Parquet shards + manifest.json"]
-        packed["data/dataset.py<br/>PackedDataset"]
+    subgraph stage2["🔧 Stage 2 — Data Pipeline"]
+        direction TB
+        ingest_s["ingest.py
+        stream JSONL records
+        add domain/quality tags"]
+        filter_s["filter.py
+        quality · lang · PII
+        safety · license"]
+        dedup_s["dedup.py
+        exact + near-dup removal"]
+        shard_s["shard.py
+        tokenize → pack
+        write Parquet shards"]
+        parquet_s[("data/processed/
+        shard-NNNNN.parquet
+        input_ids · labels · mask")]
+        ingest_s --> filter_s --> dedup_s --> shard_s --> parquet_s
     end
 
-    subgraph model["Model Stage"]
-        model_cfg["model/config.py"]
-        rms["RMSNorm"]
-        rope["RoPE"]
-        attn["GQA Attention + SDPA"]
-        mlp["SwiGLU MLP"]
-        blocks["Transformer Blocks x24"]
-        sage["SageTransformer"]
+    subgraph stage3["🧠 Stage 3 — Model"]
+        direction TB
+        config_s["ModelConfig
+        24L · 2048d · GQA 16/8"]
+        rope_s["RoPE Cache
+        base_freq=500kHz
+        context=4096"]
+        attn_s["GQAAttention
+        fused QKV · Flash-SDPA
+        KV-cache enabled"]
+        mlp_s["SwiGLU MLP
+        dim=5632"]
+        norm_s["RMSNorm
+        pre-norm · eps=1e-5"]
+        block_s["TransformerBlock × 24
+        residual connections"]
+        transformer_s["SageTransformer
+        forward → logits + KV"]
+        config_s --> rope_s & norm_s & attn_s & mlp_s
+        rope_s --> attn_s
+        norm_s & attn_s & mlp_s --> block_s --> transformer_s
     end
 
-    subgraph train["Training Stage"]
-        hw["train/hardware.py"]
-        opt["train/optimizer.py"]
-        loss["train/loss.py"]
-        ckpt["train/checkpoint.py"]
-        trainer["train/trainer.py"]
-        metrics["runs/<name>/metrics.jsonl"]
-        saves["runs/<name>/ckpt_step_xxxxxxx.pt"]
+    subgraph stage4["🏋 Stage 4 — Training"]
+        direction TB
+        hw_s["HardwareConfig
+        auto: device · dtype
+        batch · grad_accum"]
+        opt_s["AdamW + Cosine LR
+        peak 3e-4 → 3e-5
+        warmup 2000 steps"]
+        loss_s["masked_cross_entropy
+        next-token prediction"]
+        loop_s["Training Loop
+        AMP · grad clip 1.0
+        log every 10 steps"]
+        ckpt_s["Checkpoints
+        every 1000 steps
+        keep last 5"]
+        metrics_s[("runs/name/
+        metrics.jsonl
+        W&B optional")]
+        hw_s & opt_s & loss_s --> loop_s --> ckpt_s & metrics_s
     end
 
-    subgraph evals["Evaluation Stage"]
-        ppl["eval/perplexity.py"]
-        bench["eval/benchmarks.py"]
-        longctx["eval/long_context.py"]
-        regress["eval/regression.py"]
+    subgraph stage5["📊 Stage 5 — Evaluation"]
+        direction TB
+        ppl_s["Perplexity
+        val loss on held-out shards"]
+        bench_s["Benchmarks
+        task harness registry"]
+        long_s["Long Context
+        needle-in-haystack"]
+        regress_s["Regression
+        checkpoint comparison"]
+        ppl_s & bench_s & long_s --> regress_s
     end
 
-    subgraph serving["Serving Stage"]
-        kv["serve/kv_cache.py"]
-        quant["serve/quantize.py"]
-        api["serve/server.py"]
-        cpu["serve/server_cpu.py"]
-        health["/health"]
-        generate["/generate"]
+    subgraph stage6["🚀 Stage 6 — Serving"]
+        direction TB
+        kv_s["KV Cache
+        O(1) per-token gen"]
+        quant_s["Quantize
+        INT8 / GGUF export"]
+        gpu_api_s["GPU FastAPI Server
+        /health
+        /chat
+        /generate"]
+        cpu_api_s["CPU Server
+        control-plane only"]
+        ide_s["SAGE Browser IDE
+        Chat · Presets · CLI
+        Inspector · Settings"]
+        kv_s --> gpu_api_s
+        quant_s --> cpu_api_s
+        gpu_api_s --> ide_s
+        cpu_api_s --> ide_s
     end
 
-    user --> raw
-    user --> cfg_model
-    user --> cfg_train
-    user --> cfg_data
+    %% ===================== MAIN FLOW =====================
+    actor --> raw & cfg_m & cfg_t
+    raw --> stage1
+    raw --> stage2
+    cfg_m --> stage3
+    tok_model_s --> stage2
+    tok_model_s --> stage3
 
-    raw --> tok_train
-    tok_train --> tok_model
-    tok_model --> tok_validate
+    cfg_t --> stage4
+    parquet_s --> stage4
+    transformer_s --> stage4
 
-    raw --> ingest
-    cfg_data --> ingest
-    ingest --> filter
-    filter --> dedup
-    dedup --> shard
-    tok_model --> shard
-    shard --> parquet
-    parquet --> packed
+    transformer_s --> stage5
+    ckpt_s --> stage5
 
-    cfg_model --> model_cfg
-    model_cfg --> rms
-    model_cfg --> rope
-    model_cfg --> attn
-    model_cfg --> mlp
-    rms --> blocks
-    rope --> attn
-    attn --> blocks
-    mlp --> blocks
-    blocks --> sage
+    ckpt_s --> gpu_api_s
+    transformer_s --> kv_s & quant_s
 
-    packed --> trainer
-    cfg_train --> trainer
-    cfg_model --> trainer
-    hw --> trainer
-    opt --> trainer
-    loss --> trainer
-    ckpt --> trainer
-    sage --> trainer
+    %% ===================== STYLE =====================
+    classDef actor    fill:#1d4ed8,stroke:#93c5fd,color:#ffffff
+    classDef io       fill:#111827,stroke:#6b7280,color:#d1d5db
+    classDef token    fill:#0d5467,stroke:#67e8f9,color:#ffffff
+    classDef data     fill:#0f766e,stroke:#5eead4,color:#ffffff
+    classDef model    fill:#4c1d95,stroke:#c4b5fd,color:#ffffff
+    classDef train    fill:#78350f,stroke:#fcd34d,color:#ffffff
+    classDef eval     fill:#7f1d1d,stroke:#fca5a5,color:#ffffff
+    classDef serve    fill:#065f46,stroke:#86efac,color:#ffffff
 
-    trainer --> metrics
-    trainer --> saves
-    trainer --> ppl
-
-    sage --> ppl
-    sage --> bench
-    sage --> longctx
-    ppl --> regress
-    bench --> regress
-    longctx --> regress
-
-    sage --> kv
-    sage --> quant
-    sage --> api
-    quant --> cpu
-    kv --> api
-    api --> health
-    api --> generate
-    cpu --> health
-
-    classDef input fill:#0f172a,stroke:#93c5fd,color:#ffffff
-    classDef token fill:#1d4ed8,stroke:#bfdbfe,color:#ffffff
-    classDef prep fill:#0f766e,stroke:#99f6e4,color:#ffffff
-    classDef model fill:#581c87,stroke:#d8b4fe,color:#ffffff
-    classDef train fill:#92400e,stroke:#fde68a,color:#ffffff
-    classDef eval fill:#991b1b,stroke:#fecaca,color:#ffffff
-    classDef serve fill:#166534,stroke:#bbf7d0,color:#ffffff
-
-    class user,raw,cfg_model,cfg_train,cfg_data input
-    class tok_train,tok_validate,tok_model token
-    class ingest,filter,dedup,shard,parquet,packed prep
-    class model_cfg,rms,rope,attn,mlp,blocks,sage model
-    class hw,opt,loss,ckpt,trainer,metrics,saves train
-    class ppl,bench,longctx,regress eval
-    class kv,quant,api,cpu,health,generate serve
+    class actor actor
+    class raw,cfg_m,cfg_t,parquet_s,metrics_s io
+    class tok_train_s,tok_model_s,tok_val_s token
+    class ingest_s,filter_s,dedup_s,shard_s data
+    class config_s,rope_s,attn_s,mlp_s,norm_s,block_s,transformer_s model
+    class hw_s,opt_s,loss_s,loop_s,ckpt_s train
+    class ppl_s,bench_s,long_s,regress_s eval
+    class kv_s,quant_s,gpu_api_s,cpu_api_s,ide_s serve

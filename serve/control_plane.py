@@ -159,6 +159,34 @@ def _build_presets(enable_generate: bool) -> list[CommandPreset]:
             "api",
         ),
         CommandPreset(
+            "data_bootstrap",
+            "Bootstrap Dataset",
+            "Create small JSONL corpora under data/raw for tokenizer and smoke-training runs.",
+            "job",
+            (
+                PresetField("output_dir", "Output Dir", default="data/raw"),
+                PresetField("overwrite", "Overwrite Existing Files", kind="boolean", default=False),
+            ),
+        ),
+        CommandPreset(
+            "data_pipeline",
+            "Build Data Shards",
+            "Filter raw JSONL corpora, deduplicate them, then write parquet shards with the trained tokenizer.",
+            "job",
+            (
+                PresetField("tokenizer_model", "Tokenizer Model", default="tokenizer/tokenizer.model"),
+                PresetField("output_dir", "Output Dir", default="data/processed"),
+                PresetField(
+                    "sources",
+                    "Sources",
+                    kind="textarea",
+                    placeholder="general_web\ncode\nmath_science\nmultilingual\nsynthetic",
+                ),
+                PresetField("shard_size", "Shard Size", kind="number", default=2048),
+                PresetField("limit_per_source", "Limit Per Source", kind="number", default=0),
+            ),
+        ),
+        CommandPreset(
             "serve_gpu",
             "Serve GPU",
             "Start the GPU-oriented FastAPI server with uvicorn.",
@@ -188,7 +216,7 @@ def _build_presets(enable_generate: bool) -> list[CommandPreset]:
                     "input_paths",
                     "Input Paths",
                     kind="textarea",
-                    placeholder="data/raw/general_web.txt\ndata/raw/code.txt",
+                    placeholder="data/raw/general_web.jsonl\ndata/raw/code.jsonl",
                     required=True,
                 ),
                 PresetField("model_prefix", "Model Prefix", default="tokenizer/tokenizer"),
@@ -472,7 +500,49 @@ def _api_response(handler: Callable[[dict[str, Any]], dict[str, Any]], args: dic
     return {"kind": "api", "result": handler(args)}
 
 
+def _validate_preset_args(preset: CommandPreset, args: dict[str, Any]) -> None:
+    missing: list[str] = []
+    for field in preset.fields:
+        if not field.required:
+            continue
+        value = args.get(field.name)
+        if value is None:
+            missing.append(field.label)
+            continue
+        if isinstance(value, str) and not value.strip():
+            missing.append(field.label)
+            continue
+        if isinstance(value, list) and not value:
+            missing.append(field.label)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing)}")
+
+
 def _build_command_for_preset(preset_id: str, args: dict[str, Any]) -> list[str] | str:
+    if preset_id == "data_bootstrap":
+        command = [sys.executable, "-m", "data.bootstrap", "--output-dir", str(args.get("output_dir") or "data/raw")]
+        if bool(args.get("overwrite", False)):
+            command.append("--overwrite")
+        return command
+    if preset_id == "data_pipeline":
+        command = [
+            sys.executable,
+            "-m",
+            "data.pipeline",
+            "--tokenizer-model",
+            str(args.get("tokenizer_model") or "tokenizer/tokenizer.model"),
+            "--output-dir",
+            str(args.get("output_dir") or "data/processed"),
+            "--shard-size",
+            str(_parse_number(args.get("shard_size"), 2048)),
+        ]
+        sources = _split_multi_value(args.get("sources"))
+        if sources:
+            command.extend(["--sources", *sources])
+        limit_per_source = _parse_number(args.get("limit_per_source"), 0)
+        if limit_per_source > 0:
+            command.extend(["--limit-per-source", str(limit_per_source)])
+        return command
     if preset_id == "serve_gpu":
         return [
             sys.executable,
@@ -607,6 +677,7 @@ def build_control_router(api_handlers: dict[str, Callable[[dict[str, Any]], dict
             preset = preset_map.get(payload.preset_id)
             if preset is None:
                 raise HTTPException(status_code=404, detail=f"Unknown preset: {payload.preset_id}")
+            _validate_preset_args(preset, payload.args)
             if preset.mode == "api":
                 handler = api_handlers.get(payload.preset_id)
                 if handler is None:
@@ -614,11 +685,17 @@ def build_control_router(api_handlers: dict[str, Callable[[dict[str, Any]], dict
                 return _api_response(handler, payload.args)
             command = _build_command_for_preset(payload.preset_id, payload.args)
             mode = "shell" if isinstance(command, str) else "job"
-            job = CONTROL_MANAGER.start_job(preset.label, command, cwd=str(REPO_ROOT), mode=mode)
+            try:
+                job = CONTROL_MANAGER.start_job(preset.label, command, cwd=str(REPO_ROOT), mode=mode)
+            except OSError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
             return {"kind": "job", "job": job.to_dict()}
         if payload.command:
             cwd = payload.cwd or str(REPO_ROOT)
-            job = CONTROL_MANAGER.start_job("Raw Command", payload.command, cwd=cwd, mode="shell")
+            try:
+                job = CONTROL_MANAGER.start_job("Raw Command", payload.command, cwd=cwd, mode="shell")
+            except OSError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
             return {"kind": "job", "job": job.to_dict()}
         raise HTTPException(status_code=400, detail="Provide either preset_id or command.")
 

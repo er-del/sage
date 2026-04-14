@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import pytest
 
@@ -23,3 +24,22 @@ def test_validation_suite_roundtrip(tmp_path: Path) -> None:
     train_sentencepiece(str(corpus), str(prefix), vocab_size=512)
     results = run_validation_suite(str(prefix) + ".model")
     assert all(result.passed for result in results), results
+
+
+def test_write_training_text_reads_jsonl(tmp_path: Path) -> None:
+    from tokenizer.train_tokenizer import write_training_text
+
+    raw = tmp_path / "raw.jsonl"
+    raw.write_text(
+        "\n".join(
+            [
+                json.dumps({"text": "first training sample"}),
+                json.dumps({"text": "second training sample"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "combined.txt"
+    write_training_text([str(raw)], str(output))
+    assert output.read_text(encoding="utf-8").splitlines() == ["first training sample", "second training sample"]

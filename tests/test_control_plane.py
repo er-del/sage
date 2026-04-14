@@ -50,6 +50,8 @@ def test_login_and_html_index(monkeypatch) -> None:
     assert response.status_code == 200
     payload = response.json()
     preset_ids = {item["id"] for item in payload["presets"]}
+    assert "data_bootstrap" in preset_ids
+    assert "data_pipeline" in preset_ids
     assert "serve_cpu" in preset_ids
     assert "git_status" in preset_ids
 
@@ -120,3 +122,14 @@ def test_health_api_preset(monkeypatch) -> None:
     payload = response.json()
     assert payload["kind"] == "api"
     assert payload["result"]["status"] == "ok"
+
+
+def test_required_preset_field_validation(monkeypatch) -> None:
+    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+    CONTROL_MANAGER.reset_for_tests()
+    client = TestClient(app)
+    _login(client)
+
+    response = client.post("/api/commands/run", json={"preset_id": "tokenizer_train", "args": {"input_paths": ""}})
+    assert response.status_code == 400
+    assert "Input Paths" in response.json()["detail"]

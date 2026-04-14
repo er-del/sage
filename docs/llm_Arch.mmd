@@ -1,202 +1,295 @@
 ---
-title: SAGE 1B System Architecture
+title: SAGE 1B — System Architecture
 ---
 flowchart TB
 
     %% =========================================================
-    %% SAGE 1B - End-to-End Architecture and Flow Overview
+    %% SAGE 1B End-to-End System Architecture
+    %% All modules, data flows, and runtime outputs
     %% =========================================================
 
-    user["Developer / Operator"]
+    actor["👤 Developer / Operator"]
 
     subgraph repo["SAGE Repository"]
         direction TB
 
         subgraph configs["configs/"]
-            cfg_model["model/1b.yaml<br/>24L, 2048 d_model, 16Q / 8KV, 4096 ctx"]
-            cfg_data["data/mix.yaml<br/>corpus weights + split ratios"]
-            cfg_train["train/schedule.yaml<br/>LR, warmup, checkpoints, logging"]
+            cfg_model["model/1b.yaml
+            24 layers · 2048 d_model
+            16Q / 8KV heads · 4096 ctx
+            vocab 50k · RoPE 500kHz"]
+            cfg_train["train/schedule.yaml
+            LR 3e-4 → 3e-5 · warmup 2000
+            ckpt every 1000 · eval every 1000"]
         end
 
-        subgraph tokenizer["tokenizer/"]
-            tok_train["train_tokenizer.py<br/>SentencePiece BPE training"]
-            tok_validate["validate_tokenizer.py<br/>roundtrip + edge-case checks"]
-            tok_model["tokenizer.model / tokenizer.vocab"]
+        subgraph tokenizer_pkg["tokenizer/"]
+            tok_train["train_tokenizer.py
+            SentencePiece BPE
+            --vocab-size --model-prefix"]
+            tok_validate["validate_tokenizer.py
+            roundtrip + edge-case checks"]
+            tok_model[("tokenizer.model
+            tokenizer.vocab")]
         end
 
-        subgraph data_layer["data/"]
-            ingest["ingest.py<br/>source registry + raw record streaming"]
-            filter["filter.py<br/>license, lang, PII, safety, quality"]
-            dedup["dedup.py<br/>exact + near-duplicate removal"]
-            shard["shard.py<br/>tokenize -> parquet shards + manifest"]
-            dataset["dataset.py<br/>PackedDataset + skip(n_batches)"]
+        subgraph data_pkg["data/"]
+            bootstrap["bootstrap.py
+            5-source starter JSONL
+            general_web · code · math
+            multilingual · synthetic"]
+            ingest["ingest.py
+            SOURCE_REGISTRY
+            stream_source()
+            stable_record_id()"]
+            filter_mod["filter.py
+            FilterConfig
+            filter_record()
+            quality · lang · PII · safety"]
+            dedup["dedup.py
+            deduplicate_records()
+            exact + near-duplicate removal"]
+            shard["shard.py
+            ShardConfig
+            write_shards()
+            tokenize → Parquet rows"]
+            dataset_mod["dataset.py
+            DatasetConfig
+            PackedDataset
+            skip(n_batches)"]
+            pipeline_cli["pipeline.py
+            build_records()
+            run_pipeline()
+            CLI entry point"]
         end
 
-        subgraph model_layer["model/"]
-            model_cfg["config.py<br/>ModelConfig"]
-            rmsnorm["rmsnorm.py<br/>pre-norm RMSNorm"]
-            rope["rope.py<br/>RoPE cache + apply_rope"]
-            attn["attention.py<br/>fused QKV + GQA + SDPA"]
-            mlp["mlp.py<br/>SwiGLU FFN"]
-            block["block.py<br/>Transformer block"]
-            full_model["model.py<br/>SageTransformer"]
+        subgraph model_pkg["model/"]
+            model_cfg["config.py
+            ModelConfig dataclass
+            from_yaml() · to_dict()"]
+            rmsnorm["rmsnorm.py
+            RMSNorm
+            float32 accumulation"]
+            rope_mod["rope.py
+            build_rope_cache()
+            rotate_half()
+            apply_rope()"]
+            attn_mod["attention.py
+            GQAAttention
+            fused QKV proj
+            repeat_kv()
+            Flash-SDPA + KV-cache"]
+            mlp_mod["mlp.py
+            SwiGLUMLP
+            gate × up → silu → down"]
+            block_mod["block.py
+            TransformerBlock
+            pre-norm residual"]
+            sage_model["model.py
+            SageTransformer
+            _reset_parameters()
+            forward() → logits + KV"]
         end
 
-        subgraph train_layer["train/"]
-            hw["hardware.py<br/>device / dtype / batch routing"]
-            dist["distributed.py<br/>single / DDP / FSDP strategy"]
-            opt["optimizer.py<br/>AdamW + cosine schedule"]
-            loss["loss.py<br/>masked next-token cross entropy"]
-            ckpt["checkpoint.py<br/>save / prune / resume"]
-            trainer["trainer.py<br/>main training loop"]
+        subgraph train_pkg["train/"]
+            hw["hardware.py
+            HardwareConfig
+            auto device · dtype · VRAM
+            micro_batch · grad_accum"]
+            dist["distributed.py
+            get_training_strategy()
+            cpu / mps / single
+            ddp / fsdp + ZeRO"]
+            opt_mod["optimizer.py
+            ScheduleConfig
+            create_optimizer() AdamW
+            lr_lambda() cosine
+            create_scheduler()"]
+            loss_mod["loss.py
+            masked_cross_entropy()
+            next-token prediction"]
+            ckpt_mod["checkpoint.py
+            save_checkpoint()
+            load_latest_checkpoint()
+            _prune_old_checkpoints()"]
+            trainer_mod["trainer.py
+            TrainerConfig
+            train() main loop
+            AMP · grad clip · W&B
+            collate_batch()
+            create_dataloader()"]
         end
 
-        subgraph eval_layer["eval/"]
-            ppl["perplexity.py<br/>validation loss + perplexity"]
-            benches["benchmarks.py<br/>benchmark harness registry"]
-            longctx["long_context.py<br/>needle-in-haystack probes"]
-            regress["regression.py<br/>checkpoint metric comparison"]
+        subgraph eval_pkg["eval/"]
+            ppl_mod["perplexity.py
+            evaluate_perplexity()
+            val loss + ppl score"]
+            bench_mod["benchmarks.py
+            benchmark harness registry
+            run_all_benchmarks()"]
+            longctx_mod["long_context.py
+            needle-in-haystack probes
+            multi-length position tests"]
+            regress_mod["regression.py
+            compare_checkpoints()
+            metric delta reporting"]
+            run_bench["run_benchmarks.py
+            CLI entry point"]
         end
 
-        subgraph serve_layer["serve/"]
-            kv["kv_cache.py<br/>cache container"]
-            quant["quantize.py<br/>int8 export + GGUF command helper"]
-            gpu_api["server.py<br/>FastAPI GPU server"]
-            cpu_api["server_cpu.py<br/>FastAPI CPU readiness surface"]
+        subgraph serve_pkg["serve/"]
+            kv_mod["kv_cache.py
+            KVCache dataclass
+            empty() · append()"]
+            quant_mod["quantize.py
+            export_int8_state_dict()
+            gguf_conversion_command()"]
+            ctrl["control_plane.py
+            CommandPreset · PresetField
+            CommandJob · CommandManager
+            build_control_router()
+            _build_presets()
+            _build_command_for_preset()
+            HMAC session auth"]
+            gpu_server["server.py
+            FastAPI GPU app
+            get_model() lazy load
+            get_tokenizer()
+            _generate_token_ids()
+            chat_status()"]
+            cpu_server["server_cpu.py
+            FastAPI CPU app
+            control-plane only"]
+            ide["static/index.html
+            SAGE IDE
+            Chat · Presets · Jobs
+            CLI Terminal · Inspector
+            Settings · Command Palette"]
         end
 
-        subgraph scripts["scripts/"]
+        subgraph scripts_pkg["scripts/"]
             s_data["run_data_pipeline.sh"]
             s_train["run_training.sh"]
             s_eval["run_eval.sh"]
-            s_serve["run_serve.sh / run_serve_cpu.sh"]
+            s_serve["run_serve.sh"]
+            s_serve_cpu["run_serve_cpu.sh"]
+            s_tok["run_validate_tokenizer.sh"]
         end
 
         subgraph outputs["Runtime Outputs"]
-            raw["Raw text / JSONL corpora"]
-            parquet["Parquet shards + manifest.json"]
-            runs["runs/<name>/metrics.jsonl"]
-            checkpoints["runs/<name>/ckpt_step_xxxxxxx.pt"]
-            api_out["/health + /generate responses"]
+            raw_data[("data/raw/*.jsonl
+            5 source corpus files")]
+            processed[("data/processed/
+            shard-NNNNN.parquet
+            manifest.json")]
+            tok_out[("tokenizer/
+            tokenizer.model
+            tokenizer.vocab")]
+            run_metrics[("runs/name/
+            metrics.jsonl")]
+            run_ckpt[("runs/name/
+            ckpt_step_XXXXXXX.pt
+            keep last 5")]
         end
     end
 
-    %% =========================================================
-    %% Top-level usage
-    %% =========================================================
+    %% ===================== ACTOR FLOWS =====================
+    actor --> bootstrap
+    actor --> tok_train
+    actor --> pipeline_cli
+    actor --> trainer_mod
+    actor --> run_bench
+    actor --> gpu_server
+    actor --> ide
 
-    user --> s_data
-    user --> s_train
-    user --> s_eval
-    user --> s_serve
+    %% ===================== TOKENIZER =====================
+    bootstrap --> raw_data
+    raw_data --> tok_train
+    cfg_model --> tok_train
+    tok_train --> tok_out
+    tok_out --> tok_validate
+    tok_out --> shard
 
-    s_data --> tok_train
-    s_train --> trainer
-    s_eval --> benches
-    s_serve --> gpu_api
-    s_serve --> cpu_api
-
-    %% =========================================================
-    %% Tokenizer flow
-    %% =========================================================
-
-    raw --> tok_train
-    tok_train --> tok_model
-    tok_model --> tok_validate
-
-    %% =========================================================
-    %% Data preparation flow
-    %% =========================================================
-
-    raw --> ingest
-    ingest --> filter
-    filter --> dedup
+    %% ===================== DATA PIPELINE =====================
+    raw_data --> ingest
+    ingest --> filter_mod
+    filter_mod --> dedup
     dedup --> shard
-    tok_model --> shard
-    shard --> parquet
-    parquet --> dataset
+    shard --> processed
+    processed --> dataset_mod
+    pipeline_cli --> ingest
 
-    cfg_data --> ingest
-    cfg_data --> filter
-    cfg_data --> shard
-
-    %% =========================================================
-    %% Model construction flow
-    %% =========================================================
-
+    %% ===================== MODEL CONSTRUCTION =====================
     cfg_model --> model_cfg
     model_cfg --> rmsnorm
-    model_cfg --> rope
-    model_cfg --> attn
-    model_cfg --> mlp
-    rmsnorm --> block
-    rope --> attn
-    attn --> block
-    mlp --> block
-    block --> full_model
+    model_cfg --> rope_mod
+    model_cfg --> attn_mod
+    model_cfg --> mlp_mod
+    rope_mod --> attn_mod
+    rmsnorm --> block_mod
+    attn_mod --> block_mod
+    mlp_mod --> block_mod
+    block_mod --> sage_model
 
-    %% =========================================================
-    %% Training flow
-    %% =========================================================
+    %% ===================== TRAINING =====================
+    cfg_train --> opt_mod
+    cfg_train --> trainer_mod
+    cfg_train --> ckpt_mod
+    dataset_mod --> trainer_mod
+    sage_model --> trainer_mod
+    hw --> trainer_mod
+    dist --> hw
+    opt_mod --> trainer_mod
+    loss_mod --> trainer_mod
+    ckpt_mod --> trainer_mod
+    trainer_mod --> run_metrics
+    trainer_mod --> run_ckpt
+    trainer_mod --> ppl_mod
+    s_train --> trainer_mod
 
-    cfg_train --> opt
-    cfg_train --> trainer
-    cfg_train --> ckpt
-    model_cfg --> full_model
-    dataset --> trainer
-    full_model --> trainer
-    hw --> trainer
-    dist --> trainer
-    opt --> trainer
-    loss --> trainer
-    ckpt --> trainer
+    %% ===================== EVALUATION =====================
+    sage_model --> ppl_mod
+    sage_model --> bench_mod
+    sage_model --> longctx_mod
+    ppl_mod --> regress_mod
+    bench_mod --> regress_mod
+    longctx_mod --> regress_mod
+    run_bench --> bench_mod
+    s_eval --> run_bench
 
-    trainer --> runs
-    trainer --> checkpoints
-    trainer --> ppl
+    %% ===================== SERVING =====================
+    run_ckpt --> gpu_server
+    tok_out --> gpu_server
+    sage_model --> kv_mod
+    sage_model --> quant_mod
+    kv_mod --> gpu_server
+    quant_mod --> cpu_server
+    ctrl --> gpu_server
+    ctrl --> cpu_server
+    gpu_server --> ide
+    cpu_server --> ide
+    s_serve --> gpu_server
+    s_serve_cpu --> cpu_server
+    s_data --> pipeline_cli
+    s_tok --> tok_validate
 
-    %% =========================================================
-    %% Evaluation flow
-    %% =========================================================
-
-    full_model --> ppl
-    full_model --> benches
-    full_model --> longctx
-    ppl --> regress
-    benches --> regress
-    longctx --> regress
-
-    %% =========================================================
-    %% Serving flow
-    %% =========================================================
-
-    full_model --> kv
-    full_model --> quant
-    full_model --> gpu_api
-    quant --> cpu_api
-    kv --> gpu_api
-    hw --> gpu_api
-    gpu_api --> api_out
-    cpu_api --> api_out
-
-    %% =========================================================
-    %% Visual grouping
-    %% =========================================================
-
-    classDef config fill:#1f2937,stroke:#93c5fd,color:#ffffff
+    %% ===================== STYLE =====================
+    classDef actor    fill:#1d4ed8,stroke:#bfdbfe,color:#ffffff
+    classDef config   fill:#1f2937,stroke:#93c5fd,color:#ffffff
     classDef pipeline fill:#0f766e,stroke:#5eead4,color:#ffffff
-    classDef model fill:#4c1d95,stroke:#c4b5fd,color:#ffffff
-    classDef train fill:#92400e,stroke:#fcd34d,color:#ffffff
-    classDef eval fill:#7f1d1d,stroke:#fca5a5,color:#ffffff
-    classDef serve fill:#065f46,stroke:#86efac,color:#ffffff
-    classDef io fill:#111827,stroke:#9ca3af,color:#ffffff
-    classDef actor fill:#2563eb,stroke:#bfdbfe,color:#ffffff
+    classDef model    fill:#4c1d95,stroke:#c4b5fd,color:#ffffff
+    classDef train    fill:#92400e,stroke:#fcd34d,color:#ffffff
+    classDef eval     fill:#7f1d1d,stroke:#fca5a5,color:#ffffff
+    classDef serve    fill:#065f46,stroke:#86efac,color:#ffffff
+    classDef io       fill:#111827,stroke:#9ca3af,color:#d1d5db
+    classDef script   fill:#374151,stroke:#6b7280,color:#d1d5db
 
-    class user actor
-    class cfg_model,cfg_data,cfg_train config
-    class tok_train,tok_validate,ingest,filter,dedup,shard,dataset pipeline
-    class model_cfg,rmsnorm,rope,attn,mlp,block,full_model model
-    class hw,dist,opt,loss,ckpt,trainer train
-    class ppl,benches,longctx,regress eval
-    class kv,quant,gpu_api,cpu_api serve
-    class raw,parquet,runs,checkpoints,api_out,tok_model,s_data,s_train,s_eval,s_serve io
+    class actor actor
+    class cfg_model,cfg_train config
+    class bootstrap,ingest,filter_mod,dedup,shard,dataset_mod,pipeline_cli,tok_train,tok_validate pipeline
+    class model_cfg,rmsnorm,rope_mod,attn_mod,mlp_mod,block_mod,sage_model model
+    class hw,dist,opt_mod,loss_mod,ckpt_mod,trainer_mod train
+    class ppl_mod,bench_mod,longctx_mod,regress_mod,run_bench eval
+    class kv_mod,quant_mod,ctrl,gpu_server,cpu_server,ide serve
+    class raw_data,processed,tok_out,tok_model,run_metrics,run_ckpt io
+    class s_data,s_train,s_eval,s_serve,s_serve_cpu,s_tok script

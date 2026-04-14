@@ -3,500 +3,2492 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SAGE Control</title>
+  <title>SAGE IDE — LLM Control Interface</title>
+  <meta name="description" content="Full-featured IDE-style control interface for the SAGE dense language model. Manage training, data pipelines, tokenizers, inference, and git operations.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <style>
+    /* ===== CSS RESET & VARIABLES ===== */
     :root {
-      color-scheme: dark;
-      --bg: #111418;
-      --panel: #1b2026;
-      --panel-border: #2c343d;
-      --text: #e8edf2;
-      --muted: #98a4b3;
-      --accent: #4cc2ff;
-      --good: #3fb950;
-      --bad: #ff6b6b;
-      --warn: #f0b429;
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #111111;
+      --bg-tertiary: #1a1a1a;
+      --bg-input: #141414;
+      --border: #2a2a2a;
+      --border-hover: #3a3a3a;
+      --accent: #7c3aed;
+      --accent-dim: rgba(124, 58, 237, 0.15);
+      --accent-glow: rgba(124, 58, 237, 0.3);
+      --accent-text: #a78bfa;
+      --text-primary: #f0f0f0;
+      --text-secondary: #888888;
+      --text-muted: #444444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --info: #3b82f6;
+      --code-bg: #1e1e2e;
+      --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --transition: all 0.2s ease;
+      --sidebar-width: 280px;
+      --right-panel-width: 320px;
+      --topbar-height: 52px;
+      --statusbar-height: 28px;
     }
-    * { box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
     body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-    .page {
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    h1, h2 { margin: 0 0 12px; }
-    p { color: var(--muted); }
-    .grid {
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 16px;
-    }
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 12px;
-      padding: 16px;
-    }
-    label {
-      display: block;
-      margin: 10px 0 6px;
+      font-family: var(--font-ui);
       font-size: 14px;
-      color: var(--muted);
+      line-height: 1.6;
+      background: var(--bg-primary);
+      color: var(--text-primary);
     }
-    input, textarea, select, button {
-      width: 100%;
-      border-radius: 8px;
-      border: 1px solid var(--panel-border);
-      background: #11161c;
-      color: var(--text);
-      padding: 10px 12px;
-      font: inherit;
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+    ::selection { background: var(--accent-dim); color: var(--text-primary); }
+    a { color: var(--accent-text); text-decoration: none; }
+    button { cursor: pointer; font-family: var(--font-ui); }
+
+    /* ===== LOGIN OVERLAY ===== */
+    #login-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: var(--bg-primary);
+      display: flex; align-items: center; justify-content: center;
     }
-    textarea {
-      min-height: 92px;
-      resize: vertical;
+    #login-overlay.hidden { display: none; }
+    .login-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 40px; width: 380px;
+      box-shadow: 0 0 60px rgba(124,58,237,0.1);
     }
-    .button-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
+.login-card h1 {
+  font-size: 24px; font-weight: 700; margin-bottom: 4px;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+    .login-card p { color: var(--text-secondary); font-size: 13px; margin-bottom: 24px; }
+    .login-card input {
+      width: 100%; padding: 10px 14px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      color: var(--text-primary); font-size: 14px; outline: none;
+      transition: var(--transition);
     }
-    .button-row button { flex: 1; }
-    button {
-      cursor: pointer;
-      background: #18222c;
+    .login-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    .login-card .btn-login {
+      width: 100%; margin-top: 16px; padding: 10px; border: none;
+      border-radius: var(--radius); background: var(--accent);
+      color: #fff; font-weight: 600; font-size: 14px;
+      transition: var(--transition);
     }
-    button.primary {
-      background: var(--accent);
-      color: #031923;
-      border-color: transparent;
-      font-weight: 600;
+    .login-card .btn-login:hover { background: #6d28d9; }
+    .login-error { color: var(--error); font-size: 12px; margin-top: 8px; min-height: 18px; }
+
+    /* ===== LAYOUT SHELL ===== */
+    #app-shell { display: none; flex-direction: column; height: 100vh; }
+    #app-shell.active { display: flex; }
+
+    /* --- Top Bar --- */
+    .topbar {
+      height: var(--topbar-height); min-height: var(--topbar-height);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+      backdrop-filter: blur(10px); z-index: 100;
     }
-    .jobs {
-      display: grid;
-      gap: 10px;
-      margin-top: 12px;
+    .topbar-logo {
+      display: flex; align-items: center; gap: 8px; font-weight: 700;
+      font-size: 16px; white-space: nowrap;
     }
-    .job {
-      border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      padding: 12px;
-      background: #14191f;
+    .topbar-logo .logo-icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #fff;
     }
-    .job-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
+    .topbar-model-select {
+      padding: 6px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      color: var(--text-primary); font-size: 13px; outline: none;
+      transition: var(--transition);
     }
-    .badge {
-      padding: 3px 8px;
-      border-radius: 999px;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      border: 1px solid var(--panel-border);
+    .topbar-model-select:focus { border-color: var(--accent); }
+    .topbar-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text-secondary);
     }
-    .status-running, .status-completed { color: var(--good); }
-    .status-failed { color: var(--bad); }
-    .status-stopping, .status-stopped { color: var(--warn); }
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+    .status-dot.error { background: var(--error); }
+    .status-dot.warn { background: var(--warning); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .topbar-spacer { flex: 1; }
+    .topbar-btn {
+      width: 34px; height: 34px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      color: var(--text-secondary); display: flex; align-items: center;
+      justify-content: center; font-size: 16px; transition: var(--transition);
+    }
+    .topbar-btn:hover { background: var(--border); color: var(--text-primary); }
+
+    /* --- Main Content Area --- */
+    .main-layout {
+      flex: 1; display: flex; overflow: hidden;
+      position: relative;
+    }
+
+    /* --- Left Sidebar --- */
+    .sidebar {
+      width: var(--sidebar-width); min-width: var(--sidebar-width);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden; transition: min-width 0.3s ease, width 0.3s ease;
+    }
+    .sidebar.collapsed { width: 0; min-width: 0; }
+    .sidebar-section { border-bottom: 1px solid var(--border); }
+    .sidebar-section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; cursor: pointer; user-select: none;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-secondary);
+      transition: var(--transition);
+    }
+    .sidebar-section-header:hover { color: var(--text-primary); background: rgba(255,255,255,0.02); }
+    .sidebar-section-header .chevron { transition: transform 0.2s ease; font-size: 10px; }
+    .sidebar-section-header.collapsed .chevron { transform: rotate(-90deg); }
+    .sidebar-section-body { padding: 4px 8px 8px; }
+    .sidebar-section-header.collapsed + .sidebar-section-body { display: none; }
+    .sidebar-content { flex: 1; overflow-y: auto; }
+
+    .new-chat-btn {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: 8px 12px; margin-bottom: 6px;
+      border: 1px dashed var(--border); border-radius: var(--radius);
+      background: transparent; color: var(--text-secondary);
+      font-size: 13px; transition: var(--transition);
+    }
+    .new-chat-btn:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent-dim); }
+
+    .chat-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border-radius: var(--radius);
+      cursor: pointer; transition: var(--transition);
+      font-size: 13px; position: relative;
+    }
+    .chat-item:hover { background: rgba(255,255,255,0.04); }
+    .chat-item.active { background: var(--accent-dim); color: var(--accent-text); border-left: 2px solid var(--accent); }
+    .chat-item .chat-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-item .chat-date { font-size: 10px; color: var(--text-muted); }
+    .chat-item .chat-actions { display: none; gap: 4px; }
+    .chat-item:hover .chat-actions { display: flex; }
+    .chat-item:hover .chat-date { display: none; }
+    .chat-action-btn {
+      width: 22px; height: 22px; border: none; border-radius: 4px;
+      background: transparent; color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; transition: var(--transition);
+    }
+    .chat-action-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+    .chat-action-btn.delete:hover { color: var(--error); }
+
+    /* Preset/Function cards in sidebar */
+    .preset-card {
+      padding: 8px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border); margin-bottom: 4px;
+      cursor: pointer; transition: var(--transition);
+      background: var(--bg-tertiary);
+    }
+    .preset-card:hover { border-color: var(--accent); background: var(--accent-dim); }
+    .preset-card .preset-name { font-size: 13px; font-weight: 500; font-family: var(--font-mono); color: var(--accent-text); }
+    .preset-card .preset-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .preset-card .preset-badge {
+      display: inline-block; padding: 1px 6px; border-radius: 4px;
+      font-size: 10px; background: var(--accent-dim); color: var(--accent-text);
+      margin-top: 4px;
+    }
+
+    .sidebar-search {
+      width: 100%; padding: 6px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      color: var(--text-primary); font-size: 12px; outline: none;
+      margin-bottom: 6px; transition: var(--transition);
+    }
+    .sidebar-search:focus { border-color: var(--accent); }
+
+    /* --- Center Chat Area --- */
+    .chat-area {
+      flex: 1; display: flex; flex-direction: column;
+      min-width: 0; position: relative;
+    }
+
+    .messages-container {
+      flex: 1; overflow-y: auto; padding: 20px 24px;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      margin-bottom: 16px; display: flex; gap: 12px;
+      max-width: 100%; animation: msgFadeIn 0.3s ease;
+    }
+    @keyframes msgFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .message.user { flex-direction: row-reverse; }
+    .message-avatar {
+      width: 32px; height: 32px; border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .message.user .message-avatar { background: var(--accent); color: #fff; }
+    .message.assistant .message-avatar { background: linear-gradient(135deg, #1e293b, #334155); color: var(--accent-text); }
+    .message.system .message-avatar { background: var(--bg-tertiary); color: var(--text-muted); }
+
+    .message-body {
+      max-width: 80%; min-width: 120px;
+    }
+    .message.user .message-body {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-lg) 4px 4px var(--radius-lg);
+      padding: 12px 16px;
+    }
+    .message.assistant .message-body {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+      padding: 12px 16px; max-width: 90%;
+    }
+    .message.system .message-body {
+      background: transparent; text-align: center;
+      font-style: italic; color: var(--text-muted);
+      font-size: 12px; max-width: 100%; width: 100%;
+    }
+
+    .message-meta {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 4px; font-size: 11px; color: var(--text-muted);
+    }
+    .message-meta .msg-role { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .message-meta .token-badge {
+      padding: 1px 6px; border-radius: 4px;
+      background: var(--accent-dim); color: var(--accent-text);
+      font-size: 10px; font-family: var(--font-mono);
+    }
+    .message-content { font-size: 14px; line-height: 1.7; word-wrap: break-word; }
+    .message-content p { margin-bottom: 8px; }
+    .message-content p:last-child { margin-bottom: 0; }
+    .message-content strong { font-weight: 600; }
+    .message-content em { font-style: italic; }
+    .message-content del { text-decoration: line-through; color: var(--text-secondary); }
+    .message-content h1, .message-content h2, .message-content h3 {
+      margin: 12px 0 6px; font-weight: 600;
+    }
+    .message-content h1 { font-size: 20px; }
+    .message-content h2 { font-size: 17px; }
+    .message-content h3 { font-size: 15px; }
+    .message-content ul, .message-content ol { padding-left: 20px; margin-bottom: 8px; }
+    .message-content li { margin-bottom: 2px; }
+    .message-content blockquote {
+      border-left: 3px solid var(--accent); padding: 4px 12px;
+      margin: 8px 0; color: var(--text-secondary); background: var(--bg-tertiary);
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .message-content code:not(pre code) {
+      background: var(--code-bg); color: #e879f9;
+      padding: 2px 6px; border-radius: 4px;
+      font-family: var(--font-mono); font-size: 13px;
+    }
+    .message-content pre {
+      position: relative; margin: 8px 0; border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .message-content pre code {
+      display: block; padding: 14px 16px; overflow-x: auto;
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.5;
+      background: var(--code-bg); border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .code-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 12px; background: #151520;
+      border: 1px solid var(--border); border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
+      font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);
+    }
+    .code-header + pre code { border-radius: 0 0 var(--radius) var(--radius); }
+    .code-actions { display: flex; gap: 4px; }
+    .code-action-btn {
+      padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px;
+      background: transparent; color: var(--text-secondary);
+      font-size: 11px; font-family: var(--font-mono);
+      cursor: pointer; transition: var(--transition);
+    }
+    .code-action-btn:hover { background: var(--accent-dim); color: var(--accent-text); border-color: var(--accent); }
+    .message-content table {
+      width: 100%; border-collapse: collapse; margin: 8px 0;
       font-size: 13px;
     }
-    #logs, #api-result {
-      min-height: 200px;
-      white-space: pre-wrap;
-      background: #0b1015;
-      border-radius: 10px;
-      border: 1px solid var(--panel-border);
-      padding: 12px;
-      overflow: auto;
+    .message-content th, .message-content td {
+      border: 1px solid var(--border); padding: 6px 10px; text-align: left;
     }
-    .field-row {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px;
+    .message-content th { background: var(--bg-tertiary); font-weight: 600; }
+    .message-content input[type="checkbox"] { margin-right: 6px; accent-color: var(--accent); }
+
+    .message-actions {
+      display: flex; gap: 4px; margin-top: 6px;
     }
-    .inline-toggle {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .msg-action-btn {
+      padding: 3px 8px; border: 1px solid transparent; border-radius: 4px;
+      background: transparent; color: var(--text-muted);
+      font-size: 11px; cursor: pointer; transition: var(--transition);
+    }
+    .msg-action-btn:hover { background: var(--bg-tertiary); color: var(--text-secondary); border-color: var(--border); }
+
+    /* Typing indicator */
+    .typing-indicator { display: flex; gap: 4px; padding: 4px 0; }
+    .typing-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-muted); animation: typingBounce 1.4s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+
+    /* Streaming cursor */
+    .stream-cursor {
+      display: inline-block; width: 2px; height: 16px;
+      background: var(--accent); margin-left: 2px;
+      animation: cursorBlink 1s step-end infinite; vertical-align: text-bottom;
+    }
+    @keyframes cursorBlink { 50% { opacity: 0; } }
+
+    /* --- Input Area --- */
+    .input-area {
+      padding: 12px 24px 16px; border-top: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+    .input-wrapper {
+      display: flex; align-items: flex-end; gap: 8px;
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 8px 12px;
+      transition: var(--transition);
+    }
+    .input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-dim); }
+    .input-toolbar {
+      display: flex; gap: 2px; align-items: center;
+    }
+    .toolbar-btn {
+      width: 30px; height: 30px; border: none; border-radius: 6px;
+      background: transparent; color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: var(--transition); position: relative;
+    }
+    .toolbar-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+    .toolbar-btn[title]::after {
+      content: attr(title); position: absolute; bottom: 100%;
+      left: 50%; transform: translateX(-50%); padding: 4px 8px;
+      background: #222; color: #ccc; font-size: 11px;
+      border-radius: 4px; white-space: nowrap;
+      opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
+    }
+    .toolbar-btn:hover[title]::after { opacity: 1; }
+    #chat-input {
+      flex: 1; border: none; background: transparent;
+      color: var(--text-primary); font-size: 14px; font-family: var(--font-ui);
+      resize: none; outline: none; min-height: 24px; max-height: 200px;
+      line-height: 1.5; padding: 4px 0;
+    }
+    #chat-input::placeholder { color: var(--text-muted); }
+    .input-right { display: flex; align-items: center; gap: 8px; }
+    .token-count {
+      font-size: 11px; font-family: var(--font-mono);
+      color: var(--text-muted); white-space: nowrap;
+    }
+    .send-btn {
+      width: 34px; height: 34px; border: none; border-radius: var(--radius);
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; transition: var(--transition);
+    }
+    .send-btn:hover { background: #6d28d9; }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .send-btn.stop { background: var(--error); }
+    .send-btn.stop:hover { background: #dc2626; }
+
+    /* --- Right Panel --- */
+    .right-panel {
+      width: var(--right-panel-width); min-width: var(--right-panel-width);
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      transition: min-width 0.3s ease, width 0.3s ease;
+    }
+    .right-panel.collapsed { width: 0; min-width: 0; }
+    .right-panel-header {
+      padding: 12px 14px; border-bottom: 1px solid var(--border);
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .right-panel-content { flex: 1; overflow-y: auto; padding: 8px; }
+
+    .fn-detail-card {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px; margin-bottom: 8px; background: var(--bg-tertiary);
+      transition: var(--transition);
+    }
+    .fn-detail-card:hover { border-color: var(--accent); }
+    .fn-name { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--accent-text); margin-bottom: 4px; }
+    .fn-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+    .fn-params { font-size: 11px; }
+    .fn-params table { width: 100%; border-collapse: collapse; }
+    .fn-params th, .fn-params td { padding: 3px 6px; border: 1px solid var(--border); font-size: 11px; text-align: left; }
+    .fn-params th { background: rgba(255,255,255,0.03); color: var(--text-secondary); font-weight: 500; }
+    .fn-btn {
+      padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;
+      background: transparent; color: var(--text-secondary);
+      font-size: 11px; cursor: pointer; transition: var(--transition); margin-top: 6px; margin-right: 4px;
+    }
+    .fn-btn:hover { background: var(--accent-dim); color: var(--accent-text); border-color: var(--accent); }
+
+    /* --- CLI Terminal --- */
+    .cli-panel {
+      height: 0; overflow: hidden;
+      border-top: 1px solid var(--border);
+      background: #050505;
+      transition: height 0.3s ease;
+      display: flex; flex-direction: column;
+    }
+    .cli-panel.open { height: 240px; }
+    .cli-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 12px; background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--text-secondary);
+    }
+    .cli-tabs { display: flex; gap: 4px; }
+    .cli-tab {
+      padding: 3px 10px; border-radius: 4px 4px 0 0;
+      border: 1px solid var(--border); border-bottom: none;
+      background: var(--bg-tertiary); color: var(--text-secondary);
+      font-size: 11px; font-family: var(--font-mono); cursor: pointer;
+      transition: var(--transition);
+    }
+    .cli-tab.active { background: #050505; color: var(--text-primary); }
+    .cli-actions { display: flex; gap: 4px; }
+    .cli-output {
+      flex: 1; overflow-y: auto; padding: 8px 12px;
+      font-family: var(--font-mono); font-size: 12px; line-height: 1.5;
+      color: #d4d4d4; white-space: pre-wrap;
+    }
+    .cli-input-line {
+      display: flex; align-items: center; padding: 4px 12px 8px;
+      font-family: var(--font-mono); font-size: 12px;
+    }
+    .cli-prompt { color: var(--success); white-space: nowrap; margin-right: 6px; }
+    .cli-input {
+      flex: 1; border: none; background: transparent;
+      color: #d4d4d4; font-family: var(--font-mono);
+      font-size: 12px; outline: none;
+    }
+
+    /* --- Status Bar --- */
+    .statusbar {
+      height: var(--statusbar-height); min-height: var(--statusbar-height);
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 12px;
+      font-size: 11px; color: var(--text-muted);
+      gap: 16px;
+    }
+    .statusbar-left, .statusbar-center, .statusbar-right { display: flex; align-items: center; gap: 8px; }
+    .statusbar-left { flex: 1; }
+    .statusbar-right { justify-content: flex-end; flex: 1; }
+    .statusbar-item { display: flex; align-items: center; gap: 4px; }
+
+    /* ===== SETTINGS MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); width: 640px; max-width: 90vw;
+      max-height: 80vh; display: flex; flex-direction: column;
+      box-shadow: 0 0 80px rgba(124,58,237,0.15);
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { font-size: 16px; font-weight: 600; }
+    .modal-close {
+      width: 30px; height: 30px; border: 1px solid var(--border);
+      border-radius: var(--radius); background: transparent;
+      color: var(--text-secondary); font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: var(--transition);
+    }
+    .modal-close:hover { background: var(--error); color: #fff; border-color: var(--error); }
+    .modal-body { flex: 1; overflow-y: auto; padding: 20px; }
+    .settings-group { margin-bottom: 20px; }
+    .settings-group-title {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--accent-text);
+      margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    }
+    .setting-row {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 10px;
+    }
+    .setting-label { flex: 1; font-size: 13px; color: var(--text-secondary); }
+    .setting-label small { display: block; font-size: 11px; color: var(--text-muted); }
+    .setting-control { flex: 1; max-width: 240px; }
+    .setting-control input, .setting-control select, .setting-control textarea {
+      width: 100%; padding: 6px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      color: var(--text-primary); font-size: 13px; outline: none;
+      font-family: var(--font-ui); transition: var(--transition);
+    }
+    .setting-control textarea { font-family: var(--font-mono); min-height: 60px; resize: vertical; }
+    .setting-control input:focus, .setting-control select:focus, .setting-control textarea:focus {
+      border-color: var(--accent);
+    }
+    .setting-control input[type="range"] { padding: 0; background: transparent; border: none; }
+    .setting-value { font-family: var(--font-mono); font-size: 12px; color: var(--accent-text); min-width: 36px; text-align: right; }
+    .toggle-switch {
+      position: relative; width: 36px; height: 20px;
+      background: var(--border); border-radius: 10px;
+      cursor: pointer; transition: var(--transition);
+    }
+    .toggle-switch.on { background: var(--accent); }
+    .toggle-switch .toggle-knob {
+      position: absolute; top: 2px; left: 2px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--text-primary); transition: var(--transition);
+    }
+    .toggle-switch.on .toggle-knob { left: 18px; }
+    .setting-btn {
+      padding: 6px 14px; border: 1px solid var(--border);
+      border-radius: var(--radius); background: var(--bg-tertiary);
+      color: var(--text-secondary); font-size: 12px;
+      cursor: pointer; transition: var(--transition);
+    }
+    .setting-btn:hover { background: var(--accent-dim); color: var(--accent-text); border-color: var(--accent); }
+    .setting-btn.danger { border-color: #7f1d1d; }
+    .setting-btn.danger:hover { background: rgba(239,68,68,0.15); color: var(--error); border-color: var(--error); }
+    .expand-btn {
+      width: 100%; padding: 8px; border: 1px dashed var(--border);
+      border-radius: var(--radius); background: transparent;
+      color: var(--text-muted); font-size: 12px; cursor: pointer;
+      transition: var(--transition); margin-bottom: 10px;
+    }
+    .expand-btn:hover { border-color: var(--accent); color: var(--accent-text); }
+
+    /* ===== COMMAND PALETTE ===== */
+    .command-palette-overlay {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+      display: none; align-items: flex-start; justify-content: center;
+      padding-top: 15vh;
+    }
+    .command-palette-overlay.visible { display: flex; }
+    .command-palette {
+      width: 520px; max-width: 90vw;
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      box-shadow: 0 0 60px rgba(0,0,0,0.5);
+    }
+    .command-palette input {
+      width: 100%; padding: 14px 18px; border: none;
+      background: transparent; color: var(--text-primary);
+      font-size: 15px; outline: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .command-palette-results {
+      max-height: 300px; overflow-y: auto;
+    }
+    .command-palette-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px; cursor: pointer; transition: var(--transition);
+    }
+    .command-palette-item:hover, .command-palette-item.selected { background: var(--accent-dim); }
+    .command-palette-item .cmd-icon { font-size: 14px; width: 20px; text-align: center; }
+    .command-palette-item .cmd-label { flex: 1; font-size: 13px; }
+    .command-palette-item .cmd-shortcut { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+    /* ===== PRESET RUNNER MODAL ===== */
+    .preset-modal .modal { width: 520px; }
+    .preset-field-group { margin-bottom: 12px; }
+    .preset-field-group label {
+      display: block; font-size: 12px; font-weight: 500;
+      color: var(--text-secondary); margin-bottom: 4px;
+    }
+    .preset-field-group label .req { color: var(--error); }
+    .preset-field-group input, .preset-field-group textarea, .preset-field-group select {
+      width: 100%; padding: 8px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      color: var(--text-primary); font-size: 13px; outline: none;
+      font-family: var(--font-ui); transition: var(--transition);
+    }
+    .preset-field-group textarea { font-family: var(--font-mono); min-height: 68px; resize: vertical; }
+    .preset-field-group input:focus, .preset-field-group textarea:focus { border-color: var(--accent); }
+    .preset-toggle {
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+    }
+    .preset-toggle input[type="checkbox"] { accent-color: var(--accent); }
+    .preset-run-btn {
+      width: 100%; padding: 10px; border: none; border-radius: var(--radius);
+      background: var(--accent); color: #fff; font-weight: 600;
+      font-size: 14px; cursor: pointer; transition: var(--transition);
       margin-top: 12px;
     }
-    .inline-toggle input {
-      width: auto;
-      margin: 0;
+    .preset-run-btn:hover { background: #6d28d9; }
+    .preset-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ===== KEYBOARD SHORTCUTS HINT ===== */
+    .shortcuts-table { width: 100%; }
+    .shortcuts-table td { padding: 4px 8px; font-size: 12px; }
+    .shortcuts-table td:first-child { font-family: var(--font-mono); color: var(--accent-text); white-space: nowrap; }
+    .shortcuts-table td:last-child { color: var(--text-secondary); }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 900px) {
+      .sidebar { position: absolute; left: 0; top: 0; bottom: 0; z-index: 50; }
+      .sidebar.collapsed { transform: translateX(-100%); }
+      .right-panel { position: absolute; right: 0; top: 0; bottom: 0; z-index: 50; }
+      .right-panel.collapsed { transform: translateX(100%); }
     }
-    .hidden { display: none; }
-    .hint {
-      margin-top: 6px;
-      font-size: 12px;
-      color: var(--muted);
+
+    /* ===== LOADING SPINNER ===== */
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.6s linear infinite; display: inline-block;
     }
-    @media (max-width: 980px) {
-      .grid { grid-template-columns: 1fr; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== NOTIFICATION TOAST ===== */
+    .toast-container {
+      position: fixed; bottom: 40px; right: 20px;
+      z-index: 3000; display: flex; flex-direction: column; gap: 8px;
     }
+    .toast {
+      padding: 10px 16px; border-radius: var(--radius);
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      color: var(--text-primary); font-size: 13px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      animation: toastIn 0.3s ease;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--error); }
+    .toast.info { border-color: var(--info); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
-  <div class="page">
-    <h1>SAGE Remote Control</h1>
-    <p>Plain browser control panel for the local repo. Login first, then run presets or any raw command and watch logs live.</p>
 
-    <section id="login-panel" class="panel">
-      <h2>Login</h2>
-      <label for="password">Password</label>
-      <input id="password" type="password" placeholder="SAGE_WEB_PASSWORD">
-      <div class="button-row">
-        <button id="login-button" class="primary">Login</button>
+  <!-- ===== LOGIN OVERLAY ===== -->
+  <div id="login-overlay" class="hidden">
+    <div class="login-card">
+      <h1>🧠 SAGE</h1>
+      <p>LLM Control Interface — Enter your password to continue</p>
+      <input type="password" id="login-password" placeholder="SAGE_WEB_PASSWORD" autocomplete="current-password">
+      <button class="btn-login" id="login-btn">Authenticate</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+
+  <!-- ===== APP SHELL ===== -->
+  <div id="app-shell" class="active">
+
+    <!-- Top Bar -->
+    <div class="topbar">
+      <div class="topbar-logo">
+        <div class="logo-icon">S</div>
+        <span>SAGE</span>
       </div>
-      <div id="login-status" class="hint"></div>
-    </section>
+      <select class="topbar-model-select" id="model-selector" title="Active Model">
+        <option value="sage-1b">sage-1b (Local)</option>
+      </select>
+      <div class="topbar-status">
+        <span class="status-dot" id="connection-dot"></span>
+        <span id="connection-text">Connected</span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <button class="topbar-btn" id="btn-toggle-sidebar" title="Toggle Sidebar (Ctrl+/)">☰</button>
+      <button class="topbar-btn" id="btn-toggle-right" title="Toggle Inspector (Ctrl+.)">⚙</button>
+      <button class="topbar-btn" id="btn-toggle-cli" title="Toggle Terminal (Ctrl+`)">⌨</button>
+      <button class="topbar-btn" id="btn-open-settings" title="Settings (Ctrl+,)">⚡</button>
+    </div>
 
-    <div id="app-shell" class="grid hidden">
-      <div>
-        <section class="panel">
-          <h2>Preset Runner</h2>
-          <label for="preset-select">Preset</label>
-          <select id="preset-select"></select>
-          <div id="preset-description" class="hint"></div>
-          <div id="preset-fields" class="field-row"></div>
-          <div class="button-row">
-            <button id="run-preset" class="primary">Run Preset</button>
+    <!-- Main Layout -->
+    <div class="main-layout">
+
+      <!-- Left Sidebar -->
+      <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+
+          <!-- Chat History -->
+          <div class="sidebar-section">
+            <div class="sidebar-section-header" data-section="chats">
+              <span>💬 Conversations</span>
+              <span class="chevron">▼</span>
+            </div>
+            <div class="sidebar-section-body">
+              <button class="new-chat-btn" id="new-chat-btn">+ New Chat</button>
+              <div id="chat-list"></div>
+            </div>
           </div>
-        </section>
 
-        <section class="panel">
-          <h2>Raw Command</h2>
-          <label for="raw-cwd">Working Directory</label>
-          <input id="raw-cwd" type="text">
-          <label for="raw-command">Command</label>
-          <textarea id="raw-command" class="mono" placeholder="python -m train.trainer --help"></textarea>
-          <div class="button-row">
-            <button id="run-raw" class="primary">Run Raw Command</button>
+          <!-- Presets / Tools -->
+          <div class="sidebar-section">
+            <div class="sidebar-section-header" data-section="tools">
+              <span>🔧 Presets & Tools</span>
+              <span class="chevron">▼</span>
+            </div>
+            <div class="sidebar-section-body">
+              <input class="sidebar-search" id="preset-search" placeholder="Search presets...">
+              <div id="preset-list"></div>
+            </div>
           </div>
-          <div class="hint">Runs through the host shell. Use this when a preset does not cover your exact command.</div>
-        </section>
 
-        <section class="panel">
-          <h2>API Result</h2>
-          <div id="api-result" class="mono">No API result yet.</div>
-        </section>
+          <!-- Jobs -->
+          <div class="sidebar-section">
+            <div class="sidebar-section-header" data-section="jobs">
+              <span>📋 Jobs</span>
+              <span class="chevron">▼</span>
+            </div>
+            <div class="sidebar-section-body">
+              <div id="job-list" style="font-size:12px;color:var(--text-muted);">No jobs yet.</div>
+            </div>
+          </div>
+
+          <!-- Memory -->
+          <div class="sidebar-section">
+            <div class="sidebar-section-header collapsed" data-section="memory">
+              <span>🧠 Memory / Context</span>
+              <span class="chevron">▼</span>
+            </div>
+            <div class="sidebar-section-body" style="display:none;">
+              <div id="memory-list" style="font-size:12px;color:var(--text-muted);">
+                <div style="margin-bottom:6px;">System context and memory snippets sent to the model.</div>
+              </div>
+              <textarea id="memory-input" class="sidebar-search" style="min-height:50px;resize:vertical;" placeholder="Add custom context..."></textarea>
+              <button class="fn-btn" id="add-memory-btn" style="width:100%;text-align:center;margin-top:4px;">+ Add Memory</button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <section class="panel">
-          <h2>Jobs</h2>
-          <div class="button-row">
-            <button id="refresh-jobs">Refresh Jobs</button>
-          </div>
-          <div id="jobs" class="jobs"></div>
-        </section>
+      <!-- Center Area (Chat + CLI) -->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
 
-        <section class="panel">
-          <h2>Live Log</h2>
-          <div id="selected-job" class="hint">No job selected.</div>
-          <div id="logs" class="mono">Select a job to stream logs.</div>
-        </section>
+        <!-- Chat Area -->
+        <div class="chat-area">
+          <div class="messages-container" id="messages-container"></div>
+
+          <!-- Input Area -->
+          <div class="input-area">
+            <div class="input-wrapper">
+              <div class="input-toolbar">
+                <button class="toolbar-btn" title="Attach File" id="btn-attach">📎</button>
+                <button class="toolbar-btn" title="Run Preset" id="btn-fn-trigger">🔧</button>
+                <button class="toolbar-btn" title="Memory" id="btn-memory-trigger">🧠</button>
+              </div>
+              <textarea id="chat-input" rows="1" placeholder="Message SAGE... (Shift+Enter for new line, Enter to send)"></textarea>
+              <div class="input-right">
+                <span class="token-count" id="token-count">0 chars</span>
+                <button class="send-btn" id="send-btn" title="Send Message">▶</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLI Terminal -->
+        <div class="cli-panel" id="cli-panel">
+          <div class="cli-header">
+            <div class="cli-tabs">
+              <div class="cli-tab active" data-tab="0">Terminal 1</div>
+            </div>
+            <div class="cli-actions">
+              <button class="code-action-btn" id="cli-clear-btn">Clear</button>
+              <button class="code-action-btn" id="cli-close-btn">✕</button>
+            </div>
+          </div>
+          <div class="cli-output" id="cli-output"></div>
+          <div class="cli-input-line">
+            <span class="cli-prompt" id="cli-prompt-text">user@sage:~$</span>
+            <input class="cli-input" id="cli-input" placeholder="Type a command..." autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel (Function Inspector) -->
+      <div class="right-panel collapsed" id="right-panel">
+        <div class="right-panel-header">
+          <span>Function Inspector</span>
+          <button class="modal-close" id="close-right-panel" style="width:24px;height:24px;font-size:14px;">✕</button>
+        </div>
+        <input class="sidebar-search" id="fn-search" placeholder="Search functions..." style="margin:8px;">
+        <div class="right-panel-content" id="fn-inspector-content"></div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="statusbar">
+      <div class="statusbar-left">
+        <div class="statusbar-item">
+          <span class="status-dot" id="status-dot-bar" style="width:6px;height:6px;"></span>
+          <span id="status-text-bar">Connected</span>
+        </div>
+      </div>
+      <div class="statusbar-center">
+        <div class="statusbar-item"><span id="sb-model">sage-1b</span></div>
+        <div class="statusbar-item">Context: <span id="sb-context">—</span></div>
+      </div>
+      <div class="statusbar-right">
+        <div class="statusbar-item">Latency: <span id="sb-latency">—</span></div>
+        <div class="statusbar-item">Tokens: <span id="sb-tokens">0</span></div>
+        <div class="statusbar-item" style="cursor:pointer;" id="sb-settings-btn">⚙ Settings</div>
       </div>
     </div>
   </div>
 
-  <script>
-    const state = {
-      presets: [],
-      repoRoot: "",
-      selectedJobId: null,
-      stream: null,
-      pollTimer: null,
-    };
+  <!-- ===== SETTINGS MODAL ===== -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>⚙ Settings</h2>
+        <button class="modal-close" id="close-settings">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Model Configuration -->
+        <div class="settings-group">
+          <div class="settings-group-title">Model Configuration</div>
+          <div class="setting-row">
+            <div class="setting-label">Temperature <small>Controls randomness (0.0–2.0)</small></div>
+            <div class="setting-control"><input type="range" id="set-temperature" min="0" max="2" step="0.05" value="0.7"></div>
+            <span class="setting-value" id="val-temperature">0.70</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Max New Tokens <small>Maximum generation length</small></div>
+            <div class="setting-control"><input type="number" id="set-max-tokens" value="96" min="1" max="4096"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Top-P <small>Nucleus sampling threshold</small></div>
+            <div class="setting-control"><input type="range" id="set-top-p" min="0" max="1" step="0.05" value="0.9"></div>
+            <span class="setting-value" id="val-top-p">0.90</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Top-K <small>Top-K token filtering</small></div>
+            <div class="setting-control"><input type="number" id="set-top-k" value="50" min="0" max="500"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Frequency Penalty</div>
+            <div class="setting-control"><input type="range" id="set-freq-penalty" min="0" max="2" step="0.05" value="0"></div>
+            <span class="setting-value" id="val-freq-penalty">0.00</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Presence Penalty</div>
+            <div class="setting-control"><input type="range" id="set-pres-penalty" min="0" max="2" step="0.05" value="0"></div>
+            <span class="setting-value" id="val-pres-penalty">0.00</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">System Prompt</div>
+            <div class="setting-control" style="max-width:100%;flex:2;"><textarea id="set-system-prompt" rows="3" placeholder="You are SAGE, a helpful AI assistant..."></textarea></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Stop Sequences <small>Comma-separated</small></div>
+            <div class="setting-control"><input type="text" id="set-stop-seq" placeholder="e.g. [/INST], </s>"></div>
+          </div>
+        </div>
 
-    const loginPanel = document.getElementById("login-panel");
-    const loginStatus = document.getElementById("login-status");
-    const appShell = document.getElementById("app-shell");
-    const presetSelect = document.getElementById("preset-select");
-    const presetDescription = document.getElementById("preset-description");
-    const presetFields = document.getElementById("preset-fields");
-    const rawCwd = document.getElementById("raw-cwd");
-    const rawCommand = document.getElementById("raw-command");
-    const jobsEl = document.getElementById("jobs");
-    const logsEl = document.getElementById("logs");
-    const selectedJobEl = document.getElementById("selected-job");
-    const apiResultEl = document.getElementById("api-result");
+        <!-- API & Connectivity -->
+        <div class="settings-group">
+          <div class="settings-group-title">API & Connectivity</div>
+          <div class="setting-row">
+            <div class="setting-label">API Endpoint <small>Override base URL</small></div>
+            <div class="setting-control"><input type="text" id="set-api-url" placeholder="(default: current host)"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Request Timeout <small>Milliseconds</small></div>
+            <div class="setting-control"><input type="number" id="set-timeout" value="30000" min="1000"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Retry Attempts</div>
+            <div class="setting-control"><input type="number" id="set-retries" value="1" min="0" max="10"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Streaming <small>Enable SSE streaming</small></div>
+            <div class="setting-control">
+              <div class="toggle-switch on" id="set-streaming" data-key="streaming"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+        </div>
 
-    async function api(path, options = {}) {
-      const response = await fetch(path, {
-        credentials: "same-origin",
+        <!-- CLI Integration -->
+        <div class="settings-group">
+          <div class="settings-group-title">CLI Integration</div>
+          <div class="setting-row">
+            <div class="setting-label">Working Directory</div>
+            <div class="setting-control"><input type="text" id="set-cwd" placeholder="(auto-detected)"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Shell</div>
+            <div class="setting-control">
+              <select id="set-shell">
+                <option value="powershell">PowerShell</option>
+                <option value="cmd">CMD</option>
+                <option value="bash">Bash</option>
+                <option value="zsh">Zsh</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Auto-execute Commands <small>Run CLI commands automatically</small></div>
+            <div class="setting-control">
+              <div class="toggle-switch" id="set-auto-exec" data-key="autoExec"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interface -->
+        <div class="settings-group">
+          <div class="settings-group-title">Interface</div>
+          <div class="setting-row">
+            <div class="setting-label">Font Size</div>
+            <div class="setting-control"><input type="range" id="set-font-size" min="12" max="20" step="1" value="14"></div>
+            <span class="setting-value" id="val-font-size">14px</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Message Density</div>
+            <div class="setting-control">
+              <select id="set-density">
+                <option value="compact">Compact</option>
+                <option value="comfortable" selected>Comfortable</option>
+                <option value="spacious">Spacious</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Animate Streaming</div>
+            <div class="setting-control">
+              <div class="toggle-switch on" id="set-animate" data-key="animateStreaming"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Keyboard Shortcuts Reference -->
+        <div class="settings-group">
+          <div class="settings-group-title">Keyboard Shortcuts</div>
+          <table class="shortcuts-table">
+            <tr><td>Enter</td><td>Send message</td></tr>
+            <tr><td>Shift+Enter</td><td>New line</td></tr>
+            <tr><td>Ctrl+/</td><td>Toggle sidebar</td></tr>
+            <tr><td>Ctrl+.</td><td>Toggle right panel</td></tr>
+            <tr><td>Ctrl+`</td><td>Toggle CLI terminal</td></tr>
+            <tr><td>Ctrl+,</td><td>Open settings</td></tr>
+            <tr><td>Ctrl+N</td><td>New chat</td></tr>
+            <tr><td>Ctrl+K</td><td>Command palette</td></tr>
+            <tr><td>Ctrl+L</td><td>Clear terminal</td></tr>
+            <tr><td>Escape</td><td>Close modal / stop generation</td></tr>
+            <tr><td>↑ in input</td><td>Load last message</td></tr>
+          </table>
+        </div>
+
+        <!-- Advanced -->
+        <button class="expand-btn" id="expand-advanced">▸ Show Advanced / Dangerous</button>
+        <div class="settings-group" id="advanced-section" style="display:none;">
+          <div class="settings-group-title">Advanced</div>
+          <div class="setting-row">
+            <div class="setting-label">Raw JSON Config <small>Edit all settings as JSON</small></div>
+            <div class="setting-control" style="max-width:100%;flex:2;">
+              <textarea id="set-raw-json" rows="6" style="font-family:var(--font-mono);font-size:12px;"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <button class="setting-btn" id="btn-export-chats">📥 Export Conversations</button>
+            <button class="setting-btn" id="btn-import-chats">📤 Import Conversations</button>
+            <button class="setting-btn danger" id="btn-clear-all">🗑 Clear All Data</button>
+            <button class="setting-btn danger" id="btn-reset-defaults">↻ Reset to Defaults</button>
+          </div>
+          <input type="file" id="import-file-input" accept=".json" style="display:none;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PRESET RUNNER MODAL ===== -->
+  <div class="modal-overlay preset-modal" id="preset-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="preset-modal-title">Run Preset</h2>
+        <button class="modal-close" id="close-preset-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;" id="preset-modal-desc"></p>
+        <div id="preset-modal-fields"></div>
+        <button class="preset-run-btn" id="preset-run-btn">▶ Run</button>
+        <div id="preset-result" style="margin-top:12px;display:none;">
+          <div class="settings-group-title">Result</div>
+          <pre style="background:var(--code-bg);padding:12px;border-radius:var(--radius);font-family:var(--font-mono);font-size:12px;overflow:auto;max-height:200px;color:var(--text-primary);border:1px solid var(--border);"><code id="preset-result-code"></code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== COMMAND PALETTE ===== -->
+  <div class="command-palette-overlay" id="command-palette-overlay">
+    <div class="command-palette">
+      <input id="cmd-palette-input" placeholder="Type a command..." autocomplete="off" spellcheck="false">
+      <div class="command-palette-results" id="cmd-palette-results"></div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div class="toast-container" id="toast-container"></div>
+
+<script>
+/* ============================================================================
+   SAGE IDE — Full-Featured LLM Control Interface
+   All modules: Config, Storage, API, Chat, Markdown, UI, CLI, Events, App
+   ============================================================================ */
+
+// ======================== 1. CONFIG MODULE ========================
+const Config = {
+  _defaults: {
+    temperature: 0.7,
+    maxTokens: 96,
+    topP: 0.9,
+    topK: 50,
+    freqPenalty: 0,
+    presPenalty: 0,
+    systemPrompt: '',
+    stopSequences: '',
+    apiUrl: '',
+    timeout: 30000,
+    retries: 1,
+    streaming: true,
+    cwd: '',
+    shell: 'powershell',
+    autoExec: false,
+    fontSize: 14,
+    density: 'comfortable',
+    animateStreaming: true,
+  },
+  data: {},
+  load() {
+    const saved = Storage.get('sage_config');
+    this.data = { ...this._defaults, ...(saved || {}) };
+  },
+  save() {
+    Storage.set('sage_config', this.data);
+  },
+  get(key) { return this.data[key] ?? this._defaults[key]; },
+  set(key, value) { this.data[key] = value; this.save(); },
+  reset() { this.data = { ...this._defaults }; this.save(); },
+  toJSON() { return JSON.stringify(this.data, null, 2); },
+  fromJSON(json) {
+    try { const parsed = JSON.parse(json); this.data = { ...this._defaults, ...parsed }; this.save(); return true; }
+    catch { return false; }
+  }
+};
+
+// ======================== 2. STORAGE MODULE ========================
+const Storage = {
+  get(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
+  remove(key) { localStorage.removeItem(key); },
+  clear() { localStorage.clear(); }
+};
+
+// ======================== 3. API MODULE ========================
+const API = {
+  _baseUrl: '',
+  _streams: {},
+
+  async request(path, options = {}) {
+    const baseUrl = Config.get('apiUrl') || '';
+    const url = baseUrl + path;
+    const timeout = Config.get('timeout') || 30000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    const startTime = performance.now();
+    try {
+      const response = await fetch(url, {
+        credentials: 'same-origin',
+        signal: controller.signal,
         ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...(options.headers || {}),
-        },
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
       });
+      const latency = Math.round(performance.now() - startTime);
+      UI.updateLatency(latency);
+      clearTimeout(timer);
       if (response.status === 401) {
-        showLogin("Authentication required.");
-        throw new Error("Authentication required.");
+        UI.showLogin('Session expired. Please login again.');
+        throw new Error('Authentication required.');
       }
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.detail || "Request failed.");
-      }
+      if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
+      UI.setConnectionStatus('connected');
       return data;
-    }
-
-    function showLogin(message = "") {
-      loginPanel.classList.remove("hidden");
-      appShell.classList.add("hidden");
-      loginStatus.textContent = message;
-    }
-
-    function showApp() {
-      loginPanel.classList.add("hidden");
-      appShell.classList.remove("hidden");
-    }
-
-    function currentPreset() {
-      return state.presets.find((item) => item.id === presetSelect.value);
-    }
-
-    function renderPresetFields() {
-      const preset = currentPreset();
-      presetFields.innerHTML = "";
-      presetDescription.textContent = preset ? preset.description : "";
-      if (!preset) {
-        return;
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        UI.setConnectionStatus('error', 'Timeout');
+        throw new Error('Request timed out');
       }
-      for (const field of preset.fields) {
-        const wrapper = document.createElement("div");
-        const label = document.createElement("label");
-        label.textContent = field.label;
-        label.htmlFor = `field-${field.name}`;
-        wrapper.appendChild(label);
-
-        let input;
-        if (field.kind === "textarea" || field.kind === "json") {
-          input = document.createElement("textarea");
-          input.value = field.kind === "json" ? JSON.stringify(field.default ?? "", null, 2) : (field.default ?? "");
-        } else if (field.kind === "boolean") {
-          const toggle = document.createElement("div");
-          toggle.className = "inline-toggle";
-          input = document.createElement("input");
-          input.type = "checkbox";
-          input.checked = Boolean(field.default);
-          const span = document.createElement("span");
-          span.textContent = field.label;
-          toggle.appendChild(input);
-          toggle.appendChild(span);
-          wrapper.appendChild(toggle);
-          presetFields.appendChild(wrapper);
-          input.id = `field-${field.name}`;
-          input.dataset.kind = field.kind;
-          input.dataset.name = field.name;
-          continue;
-        } else {
-          input = document.createElement("input");
-          input.type = field.kind === "number" ? "number" : "text";
-          input.value = field.default ?? "";
-        }
-
-        input.id = `field-${field.name}`;
-        input.dataset.kind = field.kind;
-        input.dataset.name = field.name;
-        input.placeholder = field.placeholder || "";
-        wrapper.appendChild(input);
-        presetFields.appendChild(wrapper);
+      if (!err.message.includes('Authentication')) {
+        UI.setConnectionStatus('error', err.message);
       }
+      throw err;
     }
+  },
 
-    function collectPresetArgs() {
-      const args = {};
-      for (const element of presetFields.querySelectorAll("[data-name]")) {
-        const name = element.dataset.name;
-        const kind = element.dataset.kind;
-        if (kind === "boolean") {
-          args[name] = element.checked;
-        } else if (kind === "number") {
-          args[name] = element.value === "" ? "" : Number(element.value);
-        } else if (kind === "json") {
-          args[name] = element.value.trim() ? JSON.parse(element.value) : null;
-        } else {
-          args[name] = element.value;
-        }
-      }
-      return args;
-    }
+  async login(password) {
+    return this.request('/api/login', { method: 'POST', body: JSON.stringify({ password }) });
+  },
 
-    function renderJobs(jobs) {
-      jobsEl.innerHTML = "";
-      if (!jobs.length) {
-        jobsEl.textContent = "No jobs yet.";
-        return;
-      }
-      for (const job of jobs) {
-        const card = document.createElement("div");
-        card.className = "job";
-        const head = document.createElement("div");
-        head.className = "job-head";
-        const title = document.createElement("div");
-        title.innerHTML = `<strong>${job.label}</strong><div class="hint mono">${job.command}</div>`;
-        const badge = document.createElement("span");
-        badge.className = `badge status-${job.status}`;
-        badge.textContent = job.status;
-        head.appendChild(title);
-        head.appendChild(badge);
-        card.appendChild(head);
+  async getPresets() {
+    return this.request('/api/commands/presets');
+  },
 
-        const meta = document.createElement("div");
-        meta.className = "hint mono";
-        meta.textContent = `${job.cwd} | logs=${job.log_lines}` + (job.exit_code !== null ? ` | exit=${job.exit_code}` : "");
-        card.appendChild(meta);
+  async runPreset(presetId, args) {
+    return this.request('/api/commands/run', {
+      method: 'POST',
+      body: JSON.stringify({ preset_id: presetId, args }),
+    });
+  },
 
-        const buttons = document.createElement("div");
-        buttons.className = "button-row";
+  async runRawCommand(command, cwd) {
+    return this.request('/api/commands/run', {
+      method: 'POST',
+      body: JSON.stringify({ command, cwd }),
+    });
+  },
 
-        const selectButton = document.createElement("button");
-        selectButton.textContent = "View Logs";
-        selectButton.onclick = () => selectJob(job.id);
-        buttons.appendChild(selectButton);
+  async getJobs() {
+    return this.request('/api/jobs');
+  },
 
-        const stopButton = document.createElement("button");
-        stopButton.textContent = "Stop";
-        stopButton.disabled = !["running", "stopping"].includes(job.status);
-        stopButton.onclick = async () => {
-          try {
-            await api(`/api/jobs/${job.id}/stop`, { method: "POST", body: "{}" });
-            await refreshJobs();
-          } catch (error) {
-            apiResultEl.textContent = String(error);
-          }
-        };
-        buttons.appendChild(stopButton);
-        card.appendChild(buttons);
+  async getJob(jobId) {
+    return this.request('/api/jobs/' + jobId);
+  },
 
-        jobsEl.appendChild(card);
-      }
-    }
+  async stopJob(jobId) {
+    return this.request('/api/jobs/' + jobId + '/stop', { method: 'POST', body: '{}' });
+  },
 
-    async function refreshJobs() {
-      const payload = await api("/api/jobs");
-      renderJobs(payload.jobs || []);
-    }
+  streamJob(jobId, onLog, onStatus, onError) {
+    const baseUrl = Config.get('apiUrl') || '';
+    const es = new EventSource(baseUrl + '/api/jobs/' + jobId + '/stream');
+    es.addEventListener('log', (e) => { const d = JSON.parse(e.data); onLog(d.line); });
+    es.addEventListener('status', (e) => { const d = JSON.parse(e.data); onStatus(d); });
+    es.onerror = () => { onError(); };
+    this._streams[jobId] = es;
+    return es;
+  },
 
-    function appendLog(line) {
-      if (!line) {
-        return;
-      }
-      logsEl.textContent += (logsEl.textContent ? "\n" : "") + line;
-      logsEl.scrollTop = logsEl.scrollHeight;
-    }
+  closeStream(jobId) {
+    if (this._streams[jobId]) { this._streams[jobId].close(); delete this._streams[jobId]; }
+  },
 
-    async function selectJob(jobId) {
-      state.selectedJobId = jobId;
-      if (state.stream) {
-        state.stream.close();
-      }
-      const payload = await api(`/api/jobs/${jobId}`);
-      selectedJobEl.textContent = `${payload.job.label} | ${payload.job.command}`;
-      logsEl.textContent = (payload.logs || []).join("\n");
-      state.stream = new EventSource(`/api/jobs/${jobId}/stream`);
-      state.stream.addEventListener("log", (event) => {
-        const data = JSON.parse(event.data);
-        appendLog(data.line);
+  async getChatStatus() {
+    return this.request('/chat/status');
+  },
+
+  async sendChat(prompt, maxTokens) {
+    return this.request('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, max_new_tokens: maxTokens }),
+    });
+  },
+
+  async getHealth() {
+    return this.request('/health');
+  }
+};
+
+// ======================== 4. FUNCTION REGISTRY ========================
+const FunctionRegistry = {
+  _functions: [],
+  _presets: [],
+  _repoRoot: '',
+
+  setPresets(presets, repoRoot) {
+    this._presets = presets;
+    this._repoRoot = repoRoot;
+    this._functions = this._buildFunctionDocs(presets);
+  },
+
+  getPresets() { return this._presets; },
+  getFunctions() { return this._functions; },
+  getRepoRoot() { return this._repoRoot; },
+
+  getPreset(id) { return this._presets.find(p => p.id === id); },
+
+  _buildFunctionDocs(presets) {
+    const fns = [];
+    // Presets as functions
+    for (const p of presets) {
+      fns.push({
+        name: p.id,
+        label: p.label,
+        description: p.description,
+        type: 'preset',
+        mode: p.mode,
+        params: (p.fields || []).map(f => ({
+          name: f.name, label: f.label, type: f.kind || 'text',
+          required: f.required, default: f.default, placeholder: f.placeholder
+        }))
       });
-      state.stream.addEventListener("status", (event) => {
-        const data = JSON.parse(event.data);
-        appendLog(`[status] ${JSON.stringify(data)}`);
-        refreshJobs().catch(() => {});
-      });
-      state.stream.onerror = () => {
-        appendLog("[stream] disconnected");
+    }
+    // Core API endpoints
+    fns.push(
+      { name: 'GET /health', label: 'Health Check', description: 'Return health and hardware info', type: 'api', mode: 'api', params: [] },
+      { name: 'POST /generate', label: 'Generate Tokens', description: 'Generate continuation token IDs from input', type: 'api', mode: 'api',
+        params: [
+          { name: 'input_ids', label: 'Input IDs', type: 'json', required: true, default: [1,42,99] },
+          { name: 'max_new_tokens', label: 'Max New Tokens', type: 'number', required: false, default: 32 }
+        ]
+      },
+      { name: 'GET /chat/status', label: 'Chat Status', description: 'Check if chat is available', type: 'api', mode: 'api', params: [] },
+      { name: 'POST /chat', label: 'Chat', description: 'Generate text from a prompt via tokenizer', type: 'api', mode: 'api',
+        params: [
+          { name: 'prompt', label: 'Prompt', type: 'text', required: true },
+          { name: 'max_new_tokens', label: 'Max New Tokens', type: 'number', required: false, default: 64 }
+        ]
+      },
+    );
+    // Model architecture functions
+    const modelFns = [
+      { name: 'SageTransformer.forward', label: 'Model Forward', description: 'Run decoder forward pass, returns logits and KV cache', params: [
+        { name: 'input_ids', label: 'Input IDs', type: 'Tensor [B, T]', required: true },
+        { name: 'past_key_values', label: 'KV Cache', type: 'list[tuple]', required: false, default: 'None' }
+      ]},
+      { name: 'GQAAttention.forward', label: 'GQA Attention', description: 'Grouped-query attention with SDPA and KV-cache support', params: [
+        { name: 'hidden_states', label: 'Hidden States', type: 'Tensor', required: true },
+        { name: 'cos/sin', label: 'RoPE Tables', type: 'Tensor', required: true },
+        { name: 'past_key_value', label: 'Past KV', type: 'tuple | None', required: false }
+      ]},
+      { name: 'build_rope_cache', label: 'Build RoPE Cache', description: 'Precompute cosine/sine tables for rotary positional embeddings', params: [
+        { name: 'seq_len', label: 'Sequence Length', type: 'int', required: true },
+        { name: 'head_dim', label: 'Head Dim', type: 'int', required: true },
+        { name: 'base_frequency', label: 'Base Freq', type: 'int', required: false, default: '500000' },
+        { name: 'scaling_factor', label: 'Scale', type: 'float', required: false, default: '1.0' }
+      ]},
+      { name: 'repeat_kv', label: 'Repeat KV', description: 'Expand KV heads to match query heads count', params: [
+        { name: 'x', label: 'KV Tensor', type: 'Tensor', required: true },
+        { name: 'num_groups', label: 'Groups', type: 'int', required: true }
+      ]},
+      { name: 'RMSNorm.forward', label: 'RMS Normalization', description: 'Root mean square normalization with float32 accumulation', params: [
+        { name: 'x', label: 'Input', type: 'Tensor', required: true }
+      ]},
+      { name: 'SwiGLUMLP.forward', label: 'SwiGLU MLP', description: 'Gated feed-forward network with SiLU activation', params: [
+        { name: 'x', label: 'Input', type: 'Tensor', required: true }
+      ]},
+      { name: 'masked_cross_entropy', label: 'Masked Loss', description: 'Masked next-token cross-entropy loss', params: [
+        { name: 'logits', label: 'Logits', type: 'Tensor', required: true },
+        { name: 'labels', label: 'Labels', type: 'Tensor', required: true },
+        { name: 'loss_mask', label: 'Mask', type: 'Tensor', required: true }
+      ]},
+      { name: 'save_checkpoint', label: 'Save Checkpoint', description: 'Persist a resumable training checkpoint', params: [
+        { name: 'model', type: 'Module', required: true },
+        { name: 'optimizer', type: 'Optimizer', required: true },
+        { name: 'step', type: 'int', required: true },
+        { name: 'output_dir', type: 'str', required: true },
+        { name: 'keep', type: 'int', required: false, default: '5' }
+      ]},
+      { name: 'load_latest_checkpoint', label: 'Load Checkpoint', description: 'Load most recent checkpoint and return resume step', params: [
+        { name: 'model', type: 'Module', required: true },
+        { name: 'output_dir', type: 'str', required: true },
+        { name: 'device', type: 'str', required: true }
+      ]},
+      { name: 'export_int8_state_dict', label: 'Quantize INT8', description: 'Save a dynamic-int8 quantized model state dict', params: [
+        { name: 'model', type: 'Module', required: true },
+        { name: 'output_path', type: 'str', required: true }
+      ]},
+      { name: 'gguf_conversion_command', label: 'GGUF Convert', description: 'Return llama.cpp GGUF conversion command', params: [
+        { name: 'checkpoint_dir', type: 'str', required: true },
+        { name: 'output_path', type: 'str', required: true }
+      ]},
+      { name: 'HardwareConfig', label: 'Hardware Detect', description: 'Auto-detect device, VRAM, batch sizes, training strategy', params: [
+        { name: 'model_size_b', type: 'float', required: true },
+        { name: 'context_length', type: 'int', required: true }
+      ]},
+      { name: 'get_training_strategy', label: 'Training Strategy', description: 'Choose DDP/FSDP/single mode based on GPUs', params: [
+        { name: 'model_size_b', type: 'float', required: true }
+      ]},
+    ];
+    for (const fn of modelFns) {
+      fns.push({ ...fn, type: 'codebase', mode: 'info' });
+    }
+    return fns;
+  }
+};
+
+// ======================== 5. MARKDOWN MODULE ========================
+const Markdown = {
+  render(text) {
+    if (!text) return '';
+    let html = this._escapeHtml(text);
+
+    // Fenced code blocks
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      const langLabel = lang || 'text';
+      const rawCode = this._unescapeHtml(code.trim());
+      const highlighted = this._highlight(rawCode, langLabel);
+      const id = 'code-' + Math.random().toString(36).substr(2, 6);
+      return `<div class="code-header"><span>${langLabel}</span><div class="code-actions"><button class="code-action-btn" onclick="UI.copyCode('${id}')">Copy</button><button class="code-action-btn" onclick="CLI.runFromChat(\`${this._escapeAttr(rawCode)}\`)">Run</button></div></div><pre><code id="${id}" class="hljs language-${langLabel}">${highlighted}</code></pre>`;
+    });
+
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Headers
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // Bold, italic, strikethrough
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+    // Blockquotes
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // Checkboxes
+    html = html.replace(/^- \[x\] (.+)$/gm, '<li><input type="checkbox" checked disabled> $1</li>');
+    html = html.replace(/^- \[ \] (.+)$/gm, '<li><input type="checkbox" disabled> $1</li>');
+
+    // Unordered lists
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+
+    // Ordered lists
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+    // Tables
+    html = html.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm, (_, header, sep, body) => {
+      const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+      const rows = body.trim().split('\n').map(row => {
+        const tds = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+        return `<tr>${tds}</tr>`;
+      }).join('');
+      return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+    });
+
+    // Line breaks to paragraphs
+    html = html.split('\n\n').map(p => {
+      p = p.trim();
+      if (!p) return '';
+      if (p.startsWith('<h') || p.startsWith('<pre') || p.startsWith('<div') || p.startsWith('<table') || p.startsWith('<blockquote') || p.startsWith('<li') || p.startsWith('<ul') || p.startsWith('<ol')) return p;
+      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+    }).join('\n');
+
+    return html;
+  },
+
+  _escapeHtml(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  },
+  _unescapeHtml(text) {
+    return text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  },
+  _escapeAttr(text) {
+    return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  },
+  _highlight(code, lang) {
+    try {
+      if (hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value;
+      }
+      return hljs.highlightAuto(code).value;
+    } catch {
+      return this._escapeHtml(code);
+    }
+  }
+};
+
+// ======================== 6. CHAT MODULE ========================
+const Chat = {
+  _conversations: [],
+  _activeConvId: null,
+  _isStreaming: false,
+  _totalTokens: 0,
+  _lastUserMsg: '',
+
+  init() {
+    const saved = Storage.get('sage_conversations');
+    this._conversations = saved || [];
+    if (this._conversations.length === 0) this.newConversation();
+    else this._activeConvId = this._conversations[0].id;
+    this._totalTokens = Storage.get('sage_total_tokens') || 0;
+  },
+
+  getActiveConversation() {
+    return this._conversations.find(c => c.id === this._activeConvId);
+  },
+
+  newConversation() {
+    const conv = {
+      id: 'conv-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      title: 'New Chat',
+      messages: [],
+      createdAt: new Date().toISOString(),
+      pinned: false,
+    };
+    this._conversations.unshift(conv);
+    this._activeConvId = conv.id;
+    this._save();
+    return conv;
+  },
+
+  switchConversation(id) {
+    this._activeConvId = id;
+    UI.renderMessages();
+    UI.renderChatList();
+  },
+
+  deleteConversation(id) {
+    this._conversations = this._conversations.filter(c => c.id !== id);
+    if (this._activeConvId === id) {
+      this._activeConvId = this._conversations.length > 0 ? this._conversations[0].id : null;
+      if (!this._activeConvId) this.newConversation();
+    }
+    this._save();
+    UI.renderChatList();
+    UI.renderMessages();
+  },
+
+  addMessage(role, content, tokenCount = 0) {
+    const conv = this.getActiveConversation();
+    if (!conv) return;
+    const msg = {
+      id: 'msg-' + Date.now(),
+      role,
+      content,
+      timestamp: new Date().toISOString(),
+      tokens: tokenCount,
+    };
+    conv.messages.push(msg);
+    if (role === 'user' && conv.messages.filter(m => m.role === 'user').length === 1) {
+      conv.title = content.substring(0, 40) + (content.length > 40 ? '...' : '');
+    }
+    this._totalTokens += tokenCount;
+    Storage.set('sage_total_tokens', this._totalTokens);
+    this._save();
+    return msg;
+  },
+
+  async sendMessage(text) {
+    if (!text.trim() || this._isStreaming) return;
+    this._lastUserMsg = text;
+    const userMsg = this.addMessage('user', text);
+    UI.appendMessageToDOM(userMsg);
+
+    this._isStreaming = true;
+    UI.setStreamingState(true);
+    UI.showTypingIndicator();
+
+    const maxTokens = parseInt(Config.get('maxTokens')) || 96;
+    const startTime = performance.now();
+
+    try {
+      const payload = await API.sendChat(text, maxTokens);
+      const latency = Math.round(performance.now() - startTime);
+      UI.updateLatency(latency);
+      UI.hideTypingIndicator();
+
+      if (!payload.success) {
+        const errorMsg = this.addMessage('assistant', payload.detail || 'Chat failed.');
+        UI.appendMessageToDOM(errorMsg);
+      } else {
+        const response = payload.response || '[empty response]';
+        const tokenCount = (payload.new_token_ids || []).length;
+        const assistantMsg = this.addMessage('assistant', response, tokenCount);
+        UI.appendMessageToDOM(assistantMsg);
+      }
+
+      // Update chat status
+      if (payload.available !== undefined) {
+        AppState.chatAvailable = payload.available;
+        AppState.chatWarning = payload.warning || '';
+      }
+    } catch (err) {
+      UI.hideTypingIndicator();
+      const errorMsg = this.addMessage('assistant', '⚠ Error: ' + err.message);
+      UI.appendMessageToDOM(errorMsg);
+    }
+
+    this._isStreaming = false;
+    UI.setStreamingState(false);
+    UI.renderChatList();
+  },
+
+  stopGeneration() {
+    this._isStreaming = false;
+    UI.setStreamingState(false);
+    UI.hideTypingIndicator();
+  },
+
+  getTotalTokens() { return this._totalTokens; },
+  getLastUserMsg() { return this._lastUserMsg; },
+
+  _save() {
+    Storage.set('sage_conversations', this._conversations);
+  }
+};
+
+// ======================== 7. CLI MODULE ========================
+const CLI = {
+  _history: [],
+  _historyIndex: -1,
+  _activeJobId: null,
+  _activeStream: null,
+
+  init() {
+    this._history = Storage.get('sage_cli_history') || [];
+    this._addOutput('SAGE CLI Terminal — Type "help" for available commands.', '#888');
+  },
+
+  async executeCommand(input) {
+    if (!input.trim()) return;
+    this._history.push(input);
+    Storage.set('sage_cli_history', this._history.slice(-100));
+    this._historyIndex = this._history.length;
+
+    const prompt = document.getElementById('cli-prompt-text').textContent;
+    this._addOutput(prompt + ' ' + input, 'var(--success)');
+
+    const parts = input.trim().split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+
+    // Built-in commands
+    if (cmd === 'help') {
+      let lines = 'Available built-in commands:\n  help       — Show this help\n  config     — Show current config as JSON\n  clear      — Clear terminal\n  history    — Show command history\n  jobs       — List running jobs\n  health     — Check server health\n  presets    — List available presets\n\nOr type any shell command to run it remotely.';
+      this._addOutput(lines);
+      return;
+    }
+    if (cmd === 'config') {
+      this._addOutput(Config.toJSON());
+      return;
+    }
+    if (cmd === 'clear') {
+      document.getElementById('cli-output').innerHTML = '';
+      return;
+    }
+    if (cmd === 'history') {
+      this._addOutput(this._history.join('\n'));
+      return;
+    }
+    if (cmd === 'jobs') {
+      try {
+        const data = await API.getJobs();
+        const jobs = data.jobs || [];
+        if (jobs.length === 0) { this._addOutput('No jobs.'); return; }
+        for (const j of jobs) {
+          this._addOutput(`[${j.status}] ${j.label} — ${j.command}`, j.status === 'running' ? 'var(--success)' : j.status === 'failed' ? 'var(--error)' : '#ccc');
+        }
+      } catch (e) { this._addOutput('Error: ' + e.message, 'var(--error)'); }
+      return;
+    }
+    if (cmd === 'health') {
+      try {
+        const data = await API.getHealth();
+        this._addOutput(JSON.stringify(data, null, 2));
+      } catch (e) { this._addOutput('Error: ' + e.message, 'var(--error)'); }
+      return;
+    }
+    if (cmd === 'presets') {
+      const presets = FunctionRegistry.getPresets();
+      for (const p of presets) this._addOutput(`  ${p.id} — ${p.description}`);
+      return;
+    }
+
+    // Run as raw shell command
+    try {
+      this._addOutput('Running on server...', 'var(--text-muted)');
+      const cwd = Config.get('cwd') || FunctionRegistry.getRepoRoot();
+      const data = await API.runRawCommand(input, cwd);
+      if (data.job) {
+        this._addOutput(`Job started: ${data.job.id}`, 'var(--info)');
+        this._streamJobLogs(data.job.id);
+        AppState.refreshJobs();
+      }
+    } catch (e) {
+      this._addOutput('Error: ' + e.message, 'var(--error)');
+    }
+  },
+
+  _streamJobLogs(jobId) {
+    if (this._activeStream) this._activeStream.close();
+    this._activeJobId = jobId;
+    this._activeStream = API.streamJob(jobId,
+      (line) => this._addOutput(line),
+      (status) => {
+        this._addOutput(`[status] ${JSON.stringify(status)}`, 'var(--warning)');
+        AppState.refreshJobs();
+      },
+      () => this._addOutput('[stream disconnected]', 'var(--text-muted)')
+    );
+  },
+
+  runFromChat(cmd) {
+    UI.openCLI();
+    this._addOutput('');
+    this.executeCommand(cmd);
+    document.getElementById('cli-input').value = '';
+  },
+
+  _addOutput(text, color) {
+    const el = document.getElementById('cli-output');
+    const line = document.createElement('div');
+    line.textContent = text;
+    if (color) line.style.color = color;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  },
+
+  clear() {
+    document.getElementById('cli-output').innerHTML = '';
+  },
+
+  navigateHistory(direction) {
+    if (this._history.length === 0) return;
+    this._historyIndex += direction;
+    if (this._historyIndex < 0) this._historyIndex = 0;
+    if (this._historyIndex >= this._history.length) { this._historyIndex = this._history.length; document.getElementById('cli-input').value = ''; return; }
+    document.getElementById('cli-input').value = this._history[this._historyIndex];
+  }
+};
+
+// ======================== 8. UI MODULE ========================
+const UI = {
+  _typingEl: null,
+
+  showLogin(message = '') {
+    document.getElementById('login-overlay').classList.remove('hidden');
+    document.getElementById('app-shell').classList.remove('active');
+    if (message) document.getElementById('login-error').textContent = message;
+  },
+
+  showApp() {
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.getElementById('app-shell').classList.add('active');
+  },
+
+  renderMessages() {
+    const container = document.getElementById('messages-container');
+    container.innerHTML = '';
+    const conv = Chat.getActiveConversation();
+    if (!conv || conv.messages.length === 0) {
+      container.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;color:var(--text-muted);">
+          <div style="font-size:48px;">🧠</div>
+          <div style="font-size:18px;font-weight:600;color:var(--text-secondary);">SAGE IDE</div>
+          <div style="font-size:13px;text-align:center;max-width:400px;">Start a conversation with your local SAGE model, run presets from the sidebar, or open the CLI terminal.</div>
+        </div>`;
+      return;
+    }
+    for (const msg of conv.messages) {
+      this.appendMessageToDOM(msg, false);
+    }
+    container.scrollTop = container.scrollHeight;
+  },
+
+  appendMessageToDOM(msg, scroll = true) {
+    const container = document.getElementById('messages-container');
+    // Remove empty state if present
+    if (container.querySelector('div[style*="justify-content:center"]')) container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = `message ${msg.role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = msg.role === 'user' ? '👤' : msg.role === 'system' ? 'ℹ' : '🧠';
+
+    const body = document.createElement('div');
+    body.className = 'message-body';
+
+    const meta = document.createElement('div');
+    meta.className = 'message-meta';
+    const time = new Date(msg.timestamp);
+    meta.innerHTML = `
+      <span class="msg-role">${msg.role}</span>
+      <span class="msg-time">${time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      ${msg.tokens > 0 ? `<span class="token-badge">${msg.tokens} tokens</span>` : ''}
+    `;
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    if (msg.role === 'assistant' || msg.role === 'system') {
+      content.innerHTML = Markdown.render(msg.content);
+    } else {
+      content.textContent = msg.content;
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-action-btn';
+    copyBtn.textContent = '📋 Copy';
+    copyBtn.onclick = () => { navigator.clipboard.writeText(msg.content); Toast.show('Copied to clipboard', 'success'); };
+    actions.appendChild(copyBtn);
+
+    body.appendChild(meta);
+    body.appendChild(content);
+    body.appendChild(actions);
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(body);
+    container.appendChild(wrapper);
+
+    if (scroll) container.scrollTop = container.scrollHeight;
+    this.updateTokenDisplay();
+  },
+
+  showTypingIndicator() {
+    const container = document.getElementById('messages-container');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message assistant';
+    wrapper.id = 'typing-indicator';
+    wrapper.innerHTML = `
+      <div class="message-avatar">🧠</div>
+      <div class="message-body">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+        </div>
+      </div>`;
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+  },
+
+  hideTypingIndicator() {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+  },
+
+  setStreamingState(streaming) {
+    const btn = document.getElementById('send-btn');
+    if (streaming) {
+      btn.classList.add('stop');
+      btn.textContent = '■';
+      btn.title = 'Stop Generation';
+    } else {
+      btn.classList.remove('stop');
+      btn.textContent = '▶';
+      btn.title = 'Send Message';
+    }
+  },
+
+  renderChatList() {
+    const list = document.getElementById('chat-list');
+    list.innerHTML = '';
+    for (const conv of Chat._conversations) {
+      const item = document.createElement('div');
+      item.className = 'chat-item' + (conv.id === Chat._activeConvId ? ' active' : '');
+      const date = new Date(conv.createdAt);
+      item.innerHTML = `
+        <span class="chat-title">${this._escapeHtml(conv.title)}</span>
+        <span class="chat-date">${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+        <div class="chat-actions">
+          <button class="chat-action-btn delete" data-id="${conv.id}" title="Delete">🗑</button>
+        </div>`;
+      item.onclick = (e) => {
+        if (e.target.closest('.delete')) {
+          if (confirm('Delete this conversation?')) Chat.deleteConversation(e.target.closest('.delete').dataset.id);
+          return;
+        }
+        Chat.switchConversation(conv.id);
+      };
+      list.appendChild(item);
+    }
+  },
+
+  renderPresetList(filter = '') {
+    const list = document.getElementById('preset-list');
+    list.innerHTML = '';
+    const presets = FunctionRegistry.getPresets();
+    const lowerFilter = filter.toLowerCase();
+    for (const p of presets) {
+      if (lowerFilter && !p.label.toLowerCase().includes(lowerFilter) && !p.id.toLowerCase().includes(lowerFilter)) continue;
+      const card = document.createElement('div');
+      card.className = 'preset-card';
+      card.innerHTML = `
+        <div class="preset-name">${this._escapeHtml(p.label)}</div>
+        <div class="preset-desc">${this._escapeHtml(p.description)}</div>
+        <span class="preset-badge">${p.mode}</span>
+        ${(p.fields || []).length > 0 ? `<span class="preset-badge">${p.fields.length} params</span>` : ''}`;
+      card.onclick = () => this.openPresetModal(p.id);
+      list.appendChild(card);
+    }
+  },
+
+  renderFnInspector(filter = '') {
+    const container = document.getElementById('fn-inspector-content');
+    container.innerHTML = '';
+    const fns = FunctionRegistry.getFunctions();
+    const lowerFilter = filter.toLowerCase();
+    for (const fn of fns) {
+      if (lowerFilter && !fn.name.toLowerCase().includes(lowerFilter) && !(fn.label || '').toLowerCase().includes(lowerFilter)) continue;
+      const card = document.createElement('div');
+      card.className = 'fn-detail-card';
+      let paramsHtml = '';
+      if (fn.params && fn.params.length > 0) {
+        paramsHtml = `<div class="fn-params"><table>
+          <tr><th>Name</th><th>Type</th><th>Req</th><th>Default</th></tr>
+          ${fn.params.map(p => `<tr><td>${p.name || p.label || ''}</td><td>${p.type || '—'}</td><td>${p.required ? '✓' : ''}</td><td>${p.default !== undefined ? String(p.default) : '—'}</td></tr>`).join('')}
+        </table></div>`;
+      }
+      card.innerHTML = `
+        <div class="fn-name">${this._escapeHtml(fn.name)}</div>
+        <div class="fn-desc">${this._escapeHtml(fn.description || '')}</div>
+        ${paramsHtml}
+        <div style="margin-top:6px;">
+          ${fn.type === 'preset' ? `<button class="fn-btn" onclick="UI.openPresetModal('${fn.name}')">▶ Run</button>` : ''}
+          <button class="fn-btn" onclick="UI.insertIntoChat('${this._escapeHtml(fn.name)}')">↗ Insert into chat</button>
+        </div>`;
+      container.appendChild(card);
+    }
+  },
+
+  renderJobList() {
+    const list = document.getElementById('job-list');
+    const jobs = AppState.jobs;
+    if (jobs.length === 0) { list.innerHTML = '<span style="color:var(--text-muted);font-size:12px;">No jobs yet.</span>'; return; }
+    list.innerHTML = '';
+    for (const job of jobs) {
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;cursor:pointer;transition:all 0.2s ease;font-size:12px;';
+      const statusColor = job.status === 'running' ? 'var(--success)' : job.status === 'failed' ? 'var(--error)' : job.status === 'completed' ? 'var(--success)' : 'var(--warning)';
+      item.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="font-size:12px;">${this._escapeHtml(job.label)}</strong>
+          <span style="color:${statusColor};font-size:10px;text-transform:uppercase;">${job.status}</span>
+        </div>
+        <div style="color:var(--text-muted);font-size:10px;font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this._escapeHtml(job.command)}</div>
+        <div style="display:flex;gap:4px;margin-top:4px;">
+          <button class="fn-btn" style="margin:0;font-size:10px;" onclick="event.stopPropagation();UI.viewJobLogs('${job.id}')">Logs</button>
+          ${['running','stopping'].includes(job.status) ? `<button class="fn-btn" style="margin:0;font-size:10px;color:var(--error)" onclick="event.stopPropagation();UI.stopJob('${job.id}')">Stop</button>` : ''}
+        </div>`;
+      list.appendChild(item);
+    }
+  },
+
+  async viewJobLogs(jobId) {
+    this.openCLI();
+    try {
+      const data = await API.getJob(jobId);
+      CLI._addOutput(`=== Logs for: ${data.job.label} (${data.job.status}) ===`, 'var(--info)');
+      const logs = data.logs || [];
+      for (const line of logs.slice(-50)) CLI._addOutput(line);
+      CLI._streamJobLogs(jobId);
+    } catch (e) { CLI._addOutput('Error loading logs: ' + e.message, 'var(--error)'); }
+  },
+
+  async stopJob(jobId) {
+    try {
+      await API.stopJob(jobId);
+      Toast.show('Stopping job...', 'info');
+      AppState.refreshJobs();
+    } catch (e) { Toast.show('Error: ' + e.message, 'error'); }
+  },
+
+  openPresetModal(presetId) {
+    const preset = FunctionRegistry.getPreset(presetId);
+    if (!preset) { Toast.show('Preset not found', 'error'); return; }
+    document.getElementById('preset-modal-title').textContent = preset.label;
+    document.getElementById('preset-modal-desc').textContent = preset.description;
+    document.getElementById('preset-result').style.display = 'none';
+
+    const fieldsEl = document.getElementById('preset-modal-fields');
+    fieldsEl.innerHTML = '';
+    for (const field of (preset.fields || [])) {
+      const group = document.createElement('div');
+      group.className = 'preset-field-group';
+      if (field.kind === 'boolean') {
+        group.innerHTML = `<label class="preset-toggle"><input type="checkbox" data-name="${field.name}" data-kind="boolean" ${field.default ? 'checked' : ''}> ${this._escapeHtml(field.label)}</label>`;
+      } else if (field.kind === 'textarea' || field.kind === 'json') {
+        const val = field.kind === 'json' ? JSON.stringify(field.default ?? '', null, 2) : (field.default ?? '');
+        group.innerHTML = `<label>${this._escapeHtml(field.label)} ${field.required ? '<span class="req">*</span>' : ''}</label>
+          <textarea data-name="${field.name}" data-kind="${field.kind}" data-required="${field.required}" placeholder="${this._escapeHtml(field.placeholder || '')}">${this._escapeHtml(String(val))}</textarea>`;
+      } else {
+        group.innerHTML = `<label>${this._escapeHtml(field.label)} ${field.required ? '<span class="req">*</span>' : ''}</label>
+          <input type="${field.kind === 'number' ? 'number' : 'text'}" data-name="${field.name}" data-kind="${field.kind || 'text'}" data-required="${field.required}" value="${this._escapeHtml(String(field.default ?? ''))}" placeholder="${this._escapeHtml(field.placeholder || '')}">`;
+      }
+      fieldsEl.appendChild(group);
+    }
+
+    document.getElementById('preset-run-btn').onclick = () => this._runPresetFromModal(presetId);
+    document.getElementById('preset-run-btn').dataset.presetId = presetId;
+    document.getElementById('preset-modal').classList.add('visible');
+  },
+
+  async _runPresetFromModal(presetId) {
+    const fieldsEl = document.getElementById('preset-modal-fields');
+    const args = {};
+    for (const el of fieldsEl.querySelectorAll('[data-name]')) {
+      const name = el.dataset.name;
+      const kind = el.dataset.kind;
+      if (kind === 'boolean') { args[name] = el.checked; }
+      else if (kind === 'number') { args[name] = el.value === '' ? '' : Number(el.value); }
+      else if (kind === 'json') {
+        try { args[name] = el.value.trim() ? JSON.parse(el.value) : null; }
+        catch { Toast.show(`Invalid JSON in field: ${name}`, 'error'); return; }
+      }
+      else { args[name] = el.value; }
+    }
+
+    const btn = document.getElementById('preset-run-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+    const resultEl = document.getElementById('preset-result');
+    const resultCode = document.getElementById('preset-result-code');
+
+    try {
+      const data = await API.runPreset(presetId, args);
+      resultEl.style.display = 'block';
+      resultCode.textContent = JSON.stringify(data, null, 2);
+
+      if (data.kind === 'job' && data.job) {
+        Toast.show(`Job started: ${data.job.label}`, 'success');
+        AppState.refreshJobs();
+        // Stream logs to CLI
+        this.openCLI();
+        CLI._streamJobLogs(data.job.id);
+      } else {
+        Toast.show('API call completed', 'success');
+      }
+    } catch (e) {
+      resultEl.style.display = 'block';
+      resultCode.textContent = 'Error: ' + e.message;
+      Toast.show('Failed: ' + e.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '▶ Run';
+  },
+
+  toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  },
+
+  toggleRightPanel() {
+    document.getElementById('right-panel').classList.toggle('collapsed');
+  },
+
+  openCLI() {
+    document.getElementById('cli-panel').classList.add('open');
+  },
+
+  toggleCLI() {
+    document.getElementById('cli-panel').classList.toggle('open');
+  },
+
+  openSettings() {
+    // Populate current values
+    document.getElementById('set-temperature').value = Config.get('temperature');
+    document.getElementById('val-temperature').textContent = parseFloat(Config.get('temperature')).toFixed(2);
+    document.getElementById('set-max-tokens').value = Config.get('maxTokens');
+    document.getElementById('set-top-p').value = Config.get('topP');
+    document.getElementById('val-top-p').textContent = parseFloat(Config.get('topP')).toFixed(2);
+    document.getElementById('set-top-k').value = Config.get('topK');
+    document.getElementById('set-freq-penalty').value = Config.get('freqPenalty');
+    document.getElementById('val-freq-penalty').textContent = parseFloat(Config.get('freqPenalty')).toFixed(2);
+    document.getElementById('set-pres-penalty').value = Config.get('presPenalty');
+    document.getElementById('val-pres-penalty').textContent = parseFloat(Config.get('presPenalty')).toFixed(2);
+    document.getElementById('set-system-prompt').value = Config.get('systemPrompt');
+    document.getElementById('set-stop-seq').value = Config.get('stopSequences');
+    document.getElementById('set-api-url').value = Config.get('apiUrl');
+    document.getElementById('set-timeout').value = Config.get('timeout');
+    document.getElementById('set-retries').value = Config.get('retries');
+    document.getElementById('set-cwd').value = Config.get('cwd') || FunctionRegistry.getRepoRoot();
+    document.getElementById('set-shell').value = Config.get('shell');
+    document.getElementById('set-font-size').value = Config.get('fontSize');
+    document.getElementById('val-font-size').textContent = Config.get('fontSize') + 'px';
+    document.getElementById('set-density').value = Config.get('density');
+    document.getElementById('set-raw-json').value = Config.toJSON();
+
+    // Toggles
+    this._setToggle('set-streaming', Config.get('streaming'));
+    this._setToggle('set-auto-exec', Config.get('autoExec'));
+    this._setToggle('set-animate', Config.get('animateStreaming'));
+
+    document.getElementById('settings-modal').classList.add('visible');
+  },
+
+  closeSettings() {
+    document.getElementById('settings-modal').classList.remove('visible');
+  },
+
+  closePresetModal() {
+    document.getElementById('preset-modal').classList.remove('visible');
+  },
+
+  _setToggle(id, value) {
+    const el = document.getElementById(id);
+    if (value) el.classList.add('on'); else el.classList.remove('on');
+  },
+
+  setConnectionStatus(status, message) {
+    const dot = document.getElementById('connection-dot');
+    const text = document.getElementById('connection-text');
+    const dotBar = document.getElementById('status-dot-bar');
+    const textBar = document.getElementById('status-text-bar');
+    if (status === 'connected') {
+      dot.className = 'status-dot'; dotBar.className = 'status-dot';
+      text.textContent = 'Connected'; textBar.textContent = 'Connected';
+    } else if (status === 'error') {
+      dot.className = 'status-dot error'; dotBar.className = 'status-dot error';
+      text.textContent = message || 'Error'; textBar.textContent = message || 'Error';
+    } else {
+      dot.className = 'status-dot warn'; dotBar.className = 'status-dot warn';
+      text.textContent = message || 'Warning'; textBar.textContent = message || 'Warning';
+    }
+  },
+
+  updateLatency(ms) {
+    document.getElementById('sb-latency').textContent = ms + 'ms';
+  },
+
+  updateTokenDisplay() {
+    document.getElementById('sb-tokens').textContent = Chat.getTotalTokens();
+  },
+
+  copyCode(id) {
+    const el = document.getElementById(id);
+    if (el) {
+      navigator.clipboard.writeText(el.textContent);
+      Toast.show('Code copied!', 'success');
+    }
+  },
+
+  insertIntoChat(text) {
+    const input = document.getElementById('chat-input');
+    input.value += (input.value ? '\n' : '') + text;
+    input.focus();
+  },
+
+  _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+};
+
+// ======================== 9. TOAST MODULE ========================
+const Toast = {
+  show(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span> ${message}`;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+  }
+};
+
+// ======================== 10. COMMAND PALETTE ========================
+const CommandPalette = {
+  _commands: [],
+  _selectedIndex: 0,
+
+  init() {
+    this._commands = [
+      { label: 'New Chat', icon: '💬', shortcut: 'Ctrl+N', action: () => { Chat.newConversation(); UI.renderMessages(); UI.renderChatList(); } },
+      { label: 'Toggle Sidebar', icon: '📁', shortcut: 'Ctrl+/', action: () => UI.toggleSidebar() },
+      { label: 'Toggle Inspector', icon: '🔍', shortcut: 'Ctrl+.', action: () => UI.toggleRightPanel() },
+      { label: 'Toggle Terminal', icon: '⌨', shortcut: 'Ctrl+`', action: () => UI.toggleCLI() },
+      { label: 'Open Settings', icon: '⚙', shortcut: 'Ctrl+,', action: () => UI.openSettings() },
+      { label: 'Clear Terminal', icon: '🧹', shortcut: 'Ctrl+L', action: () => CLI.clear() },
+      { label: 'Health Check', icon: '❤', shortcut: '', action: () => UI.openPresetModal('health_check') },
+      { label: 'Refresh Jobs', icon: '🔄', shortcut: '', action: () => AppState.refreshJobs() },
+      { label: 'Export Conversations', icon: '📥', shortcut: '', action: () => AppState.exportConversations() },
+    ];
+    // Add presets
+    for (const p of FunctionRegistry.getPresets()) {
+      this._commands.push({ label: `Preset: ${p.label}`, icon: '🔧', shortcut: '', action: () => UI.openPresetModal(p.id) });
+    }
+  },
+
+  show() {
+    this._selectedIndex = 0;
+    const overlay = document.getElementById('command-palette-overlay');
+    overlay.classList.add('visible');
+    const input = document.getElementById('cmd-palette-input');
+    input.value = '';
+    input.focus();
+    this._render('');
+  },
+
+  hide() {
+    document.getElementById('command-palette-overlay').classList.remove('visible');
+  },
+
+  _render(filter) {
+    const container = document.getElementById('cmd-palette-results');
+    container.innerHTML = '';
+    const lf = filter.toLowerCase();
+    const filtered = this._commands.filter(c => !lf || c.label.toLowerCase().includes(lf));
+    filtered.forEach((cmd, i) => {
+      const item = document.createElement('div');
+      item.className = 'command-palette-item' + (i === this._selectedIndex ? ' selected' : '');
+      item.innerHTML = `<span class="cmd-icon">${cmd.icon}</span><span class="cmd-label">${cmd.label}</span>${cmd.shortcut ? `<span class="cmd-shortcut">${cmd.shortcut}</span>` : ''}`;
+      item.onclick = () => { cmd.action(); this.hide(); };
+      container.appendChild(item);
+    });
+    this._filteredCommands = filtered;
+  },
+
+  navigate(dir) {
+    this._selectedIndex = Math.max(0, Math.min(this._selectedIndex + dir, (this._filteredCommands || []).length - 1));
+    this._render(document.getElementById('cmd-palette-input').value);
+  },
+
+  executeSelected() {
+    if (this._filteredCommands && this._filteredCommands[this._selectedIndex]) {
+      this._filteredCommands[this._selectedIndex].action();
+      this.hide();
+    }
+  }
+};
+
+// ======================== 11. EVENTS MODULE ========================
+const Events = {
+  init() {
+    // Login
+    document.getElementById('login-btn').onclick = async () => {
+      const pw = document.getElementById('login-password').value;
+      try {
+        await API.login(pw);
+        UI.showApp();
+        await AppState.bootstrap();
+      } catch (e) { document.getElementById('login-error').textContent = e.message; }
+    };
+    document.getElementById('login-password').onkeydown = (e) => {
+      if (e.key === 'Enter') document.getElementById('login-btn').click();
+    };
+
+    // Chat input
+    const chatInput = document.getElementById('chat-input');
+    chatInput.oninput = () => {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
+      document.getElementById('token-count').textContent = chatInput.value.length + ' chars';
+    };
+    chatInput.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (Chat._isStreaming) return;
+        Chat.sendMessage(chatInput.value);
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        document.getElementById('token-count').textContent = '0 chars';
+      }
+      if (e.key === 'ArrowUp' && chatInput.value === '') {
+        chatInput.value = Chat.getLastUserMsg();
+      }
+    };
+
+    // Send button
+    document.getElementById('send-btn').onclick = () => {
+      if (Chat._isStreaming) { Chat.stopGeneration(); return; }
+      Chat.sendMessage(chatInput.value);
+      chatInput.value = '';
+      chatInput.style.height = 'auto';
+    };
+
+    // New chat
+    document.getElementById('new-chat-btn').onclick = () => {
+      Chat.newConversation();
+      UI.renderMessages();
+      UI.renderChatList();
+    };
+
+    // Sidebar section toggles
+    document.querySelectorAll('.sidebar-section-header').forEach(header => {
+      header.onclick = () => header.classList.toggle('collapsed');
+    });
+
+    // Preset search
+    document.getElementById('preset-search').oninput = (e) => UI.renderPresetList(e.target.value);
+
+    // Function inspector search
+    document.getElementById('fn-search').oninput = (e) => UI.renderFnInspector(e.target.value);
+
+    // Topbar buttons
+    document.getElementById('btn-toggle-sidebar').onclick = () => UI.toggleSidebar();
+    document.getElementById('btn-toggle-right').onclick = () => UI.toggleRightPanel();
+    document.getElementById('btn-toggle-cli').onclick = () => UI.toggleCLI();
+    document.getElementById('btn-open-settings').onclick = () => UI.openSettings();
+    document.getElementById('close-right-panel').onclick = () => UI.toggleRightPanel();
+    document.getElementById('sb-settings-btn').onclick = () => UI.openSettings();
+
+    // Settings modal
+    document.getElementById('close-settings').onclick = () => UI.closeSettings();
+    document.getElementById('settings-modal').onclick = (e) => { if (e.target === e.currentTarget) UI.closeSettings(); };
+
+    // Settings sliders
+    const sliders = [
+      ['set-temperature', 'val-temperature', 'temperature', v => parseFloat(v).toFixed(2)],
+      ['set-top-p', 'val-top-p', 'topP', v => parseFloat(v).toFixed(2)],
+      ['set-freq-penalty', 'val-freq-penalty', 'freqPenalty', v => parseFloat(v).toFixed(2)],
+      ['set-pres-penalty', 'val-pres-penalty', 'presPenalty', v => parseFloat(v).toFixed(2)],
+      ['set-font-size', 'val-font-size', 'fontSize', v => v + 'px'],
+    ];
+    for (const [id, valId, key, fmt] of sliders) {
+      document.getElementById(id).oninput = (e) => {
+        document.getElementById(valId).textContent = fmt(e.target.value);
+        Config.set(key, parseFloat(e.target.value));
+        if (key === 'fontSize') document.body.style.fontSize = e.target.value + 'px';
       };
     }
 
-    async function loadPresets() {
-      const payload = await api("/api/commands/presets");
-      state.presets = payload.presets || [];
-      state.repoRoot = payload.repo_root || "";
-      rawCwd.value = state.repoRoot;
-      presetSelect.innerHTML = "";
-      for (const preset of state.presets) {
-        const option = document.createElement("option");
-        option.value = preset.id;
-        option.textContent = preset.label;
-        presetSelect.appendChild(option);
-      }
-      renderPresetFields();
+    // Settings inputs
+    const inputs = [
+      ['set-max-tokens', 'maxTokens', 'int'],
+      ['set-top-k', 'topK', 'int'],
+      ['set-system-prompt', 'systemPrompt', 'str'],
+      ['set-stop-seq', 'stopSequences', 'str'],
+      ['set-api-url', 'apiUrl', 'str'],
+      ['set-timeout', 'timeout', 'int'],
+      ['set-retries', 'retries', 'int'],
+      ['set-cwd', 'cwd', 'str'],
+      ['set-density', 'density', 'str'],
+    ];
+    for (const [id, key, type] of inputs) {
+      document.getElementById(id).onchange = (e) => {
+        Config.set(key, type === 'int' ? parseInt(e.target.value) : e.target.value);
+      };
     }
+    document.getElementById('set-shell').onchange = (e) => Config.set('shell', e.target.value);
 
-    async function login() {
-      const password = document.getElementById("password").value;
-      try {
-        await api("/api/login", {
-          method: "POST",
-          body: JSON.stringify({ password }),
-        });
-        showApp();
-        await loadPresets();
-        await refreshJobs();
-        if (state.pollTimer) {
-          clearInterval(state.pollTimer);
-        }
-        state.pollTimer = setInterval(() => refreshJobs().catch(() => {}), 4000);
-      } catch (error) {
-        loginStatus.textContent = String(error.message || error);
-      }
-    }
-
-    document.getElementById("login-button").addEventListener("click", login);
-    presetSelect.addEventListener("change", renderPresetFields);
-    document.getElementById("refresh-jobs").addEventListener("click", () => refreshJobs().catch((error) => {
-      apiResultEl.textContent = String(error.message || error);
-    }));
-    document.getElementById("run-preset").addEventListener("click", async () => {
-      const preset = currentPreset();
-      if (!preset) {
-        return;
-      }
-      try {
-        const payload = await api("/api/commands/run", {
-          method: "POST",
-          body: JSON.stringify({ preset_id: preset.id, args: collectPresetArgs() }),
-        });
-        if (payload.kind === "api") {
-          apiResultEl.textContent = JSON.stringify(payload.result, null, 2);
-          return;
-        }
-        apiResultEl.textContent = JSON.stringify(payload.job, null, 2);
-        await refreshJobs();
-        await selectJob(payload.job.id);
-      } catch (error) {
-        apiResultEl.textContent = String(error.message || error);
-      }
-    });
-    document.getElementById("run-raw").addEventListener("click", async () => {
-      try {
-        const payload = await api("/api/commands/run", {
-          method: "POST",
-          body: JSON.stringify({ command: rawCommand.value, cwd: rawCwd.value }),
-        });
-        apiResultEl.textContent = JSON.stringify(payload.job, null, 2);
-        await refreshJobs();
-        await selectJob(payload.job.id);
-      } catch (error) {
-        apiResultEl.textContent = String(error.message || error);
-      }
+    // Setting toggles
+    document.querySelectorAll('.toggle-switch').forEach(el => {
+      el.onclick = () => {
+        el.classList.toggle('on');
+        const key = el.dataset.key;
+        if (key) Config.set(key, el.classList.contains('on'));
+      };
     });
 
-    loadPresets().then(() => {
-      showApp();
-      refreshJobs().catch(() => showLogin(""));
-    }).catch(() => showLogin("Enter the control password."));
-  </script>
+    // Advanced section
+    document.getElementById('expand-advanced').onclick = (e) => {
+      const section = document.getElementById('advanced-section');
+      const shown = section.style.display !== 'none';
+      section.style.display = shown ? 'none' : 'block';
+      e.target.textContent = shown ? '▸ Show Advanced / Dangerous' : '▾ Hide Advanced';
+    };
+
+    // Raw JSON config
+    document.getElementById('set-raw-json').onblur = (e) => {
+      if (Config.fromJSON(e.target.value)) Toast.show('Config updated', 'success');
+      else Toast.show('Invalid JSON', 'error');
+    };
+
+    // Export/Import
+    document.getElementById('btn-export-chats').onclick = () => AppState.exportConversations();
+    document.getElementById('btn-import-chats').onclick = () => document.getElementById('import-file-input').click();
+    document.getElementById('import-file-input').onchange = (e) => AppState.importConversations(e.target.files[0]);
+    document.getElementById('btn-clear-all').onclick = () => {
+      if (confirm('This will delete ALL conversations, settings, and CLI history. Continue?')) {
+        Storage.clear(); location.reload();
+      }
+    };
+    document.getElementById('btn-reset-defaults').onclick = () => {
+      if (confirm('Reset all settings to defaults?')) { Config.reset(); UI.closeSettings(); Toast.show('Settings reset', 'success'); }
+    };
+
+    // Preset modal
+    document.getElementById('close-preset-modal').onclick = () => UI.closePresetModal();
+    document.getElementById('preset-modal').onclick = (e) => { if (e.target === e.currentTarget) UI.closePresetModal(); };
+
+    // CLI
+    document.getElementById('cli-input').onkeydown = (e) => {
+      if (e.key === 'Enter') { CLI.executeCommand(e.target.value); e.target.value = ''; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); CLI.navigateHistory(-1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); CLI.navigateHistory(1); }
+    };
+    document.getElementById('cli-clear-btn').onclick = () => CLI.clear();
+    document.getElementById('cli-close-btn').onclick = () => UI.toggleCLI();
+
+    // Toolbar buttons
+    document.getElementById('btn-fn-trigger').onclick = () => CommandPalette.show();
+    document.getElementById('btn-memory-trigger').onclick = () => {
+      document.querySelectorAll('.sidebar-section-header').forEach(h => {
+        if (h.dataset.section === 'memory' && h.classList.contains('collapsed')) h.click();
+      });
+    };
+    document.getElementById('add-memory-btn').onclick = () => {
+      const input = document.getElementById('memory-input');
+      if (input.value.trim()) {
+        const memList = document.getElementById('memory-list');
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:4px 8px;margin-bottom:4px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;font-size:11px;display:flex;justify-content:space-between;align-items:center;';
+        item.innerHTML = `<span>${UI._escapeHtml(input.value.trim().substring(0, 60))}</span><button class="chat-action-btn delete" onclick="this.parentElement.remove()" style="font-size:10px;">✕</button>`;
+        memList.appendChild(item);
+        input.value = '';
+        Toast.show('Memory added', 'success');
+      }
+    };
+
+    // Command palette
+    document.getElementById('command-palette-overlay').onclick = (e) => { if (e.target === e.currentTarget) CommandPalette.hide(); };
+    document.getElementById('cmd-palette-input').oninput = (e) => CommandPalette._render(e.target.value);
+    document.getElementById('cmd-palette-input').onkeydown = (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); CommandPalette.navigate(1); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); CommandPalette.navigate(-1); }
+      if (e.key === 'Enter') { e.preventDefault(); CommandPalette.executeSelected(); }
+      if (e.key === 'Escape') CommandPalette.hide();
+    };
+
+    // Global keyboard shortcuts
+    document.onkeydown = (e) => {
+      // Escape
+      if (e.key === 'Escape') {
+        if (document.getElementById('command-palette-overlay').classList.contains('visible')) { CommandPalette.hide(); return; }
+        if (document.getElementById('settings-modal').classList.contains('visible')) { UI.closeSettings(); return; }
+        if (document.getElementById('preset-modal').classList.contains('visible')) { UI.closePresetModal(); return; }
+        if (Chat._isStreaming) { Chat.stopGeneration(); return; }
+      }
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '/') { e.preventDefault(); UI.toggleSidebar(); }
+        if (e.key === '.') { e.preventDefault(); UI.toggleRightPanel(); }
+        if (e.key === '`') { e.preventDefault(); UI.toggleCLI(); }
+        if (e.key === ',') { e.preventDefault(); UI.openSettings(); }
+        if (e.key === 'n' || e.key === 'N') { e.preventDefault(); Chat.newConversation(); UI.renderMessages(); UI.renderChatList(); }
+        if (e.key === 'k' || e.key === 'K') { e.preventDefault(); CommandPalette.show(); }
+        if (e.key === 'l' || e.key === 'L') {
+          if (document.getElementById('cli-panel').classList.contains('open')) { e.preventDefault(); CLI.clear(); }
+        }
+      }
+    };
+
+    // File attach btn (placeholder)
+    document.getElementById('btn-attach').onclick = () => Toast.show('File upload: drag & drop files into the chat area', 'info');
+  }
+};
+
+// ======================== 12. APP STATE & INIT ========================
+const AppState = {
+  chatAvailable: false,
+  chatWarning: '',
+  jobs: [],
+  pollTimer: null,
+
+  async bootstrap() {
+    try {
+      const data = await API.getPresets();
+      FunctionRegistry.setPresets(data.presets || [], data.repo_root || '');
+      Config.set('cwd', Config.get('cwd') || data.repo_root || '');
+      document.getElementById('cli-prompt-text').textContent = `user@sage:${(data.repo_root || '~').split(/[\\/]/).pop()}$`;
+
+      UI.renderPresetList();
+      UI.renderFnInspector();
+      CommandPalette.init();
+
+      await this.refreshJobs();
+      await this.loadChatStatus();
+
+      if (!this.pollTimer) {
+        this.pollTimer = setInterval(() => this.refreshJobs().catch(() => {}), 5000);
+      }
+    } catch (e) {
+      Toast.show('Bootstrap error: ' + e.message, 'error');
+    }
+  },
+
+  async refreshJobs() {
+    try {
+      const data = await API.getJobs();
+      this.jobs = data.jobs || [];
+      UI.renderJobList();
+    } catch {}
+  },
+
+  async loadChatStatus() {
+    try {
+      const data = await API.getChatStatus();
+      this.chatAvailable = data.available;
+      this.chatWarning = data.warning || '';
+      document.getElementById('sb-context').textContent = data.checkpoint_loaded ? `Step ${data.checkpoint_step}` : 'No checkpoint';
+      if (data.warning) UI.setConnectionStatus('warn', 'Chat: ' + (data.available ? 'Ready' : 'Unavailable'));
+      else UI.setConnectionStatus('connected');
+    } catch {}
+  },
+
+  exportConversations() {
+    const data = JSON.stringify(Chat._conversations, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'sage_conversations.json'; a.click();
+    URL.revokeObjectURL(url);
+    Toast.show('Conversations exported', 'success');
+  },
+
+  importConversations(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (Array.isArray(data)) {
+          Chat._conversations = data;
+          Chat._activeConvId = data[0]?.id;
+          Storage.set('sage_conversations', data);
+          UI.renderChatList();
+          UI.renderMessages();
+          Toast.show('Conversations imported', 'success');
+        }
+      } catch { Toast.show('Invalid JSON file', 'error'); }
+    };
+    reader.readAsText(file);
+  }
+};
+
+// ======================== 13. APP INIT ========================
+const App = {
+  async init() {
+    Config.load();
+    Chat.init();
+    CLI.init();
+    Events.init();
+    UI.renderChatList();
+    UI.renderMessages();
+    UI.updateTokenDisplay();
+
+    // Apply saved font size
+    const fontSize = Config.get('fontSize');
+    if (fontSize && fontSize !== 14) document.body.style.fontSize = fontSize + 'px';
+
+    // Skip login — load directly
+    UI.showApp();
+    try {
+      await AppState.bootstrap();
+    } catch (e) {
+      console.warn('Bootstrap error (server may not be running):', e.message);
+    }
+  }
+};
+
+App.init();
+</script>
 </body>
 </html>
