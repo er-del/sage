@@ -331,18 +331,13 @@ Hardware is auto-detected. The system selects the appropriate strategy:
 ### GPU Server (PyTorch)
 
 ```bash
-# Windows PowerShell
-$env:SAGE_MODEL_CONFIG   = "configs/model/1b.yaml"
-$env:SAGE_CHECKPOINT_DIR = "runs/sage-1b"
-$env:SAGE_TOKENIZER_MODEL = "tokenizer/tokenizer.model"
-
-python -m uvicorn serve.server:app --host 0.0.0.0 --port 8000
+python -m serve.start --host 0.0.0.0 --port 8000
 ```
 
 ### CPU Server (Control-plane only)
 
 ```bash
-python -m uvicorn serve.server_cpu:app --host 0.0.0.0 --port 8001
+python -m serve.start --cpu --host 0.0.0.0 --port 8001
 ```
 
 ### API Endpoints

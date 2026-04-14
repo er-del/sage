@@ -62,6 +62,16 @@ def _resolve_tokenizer_path() -> Path:
     return Path(os.environ.get("SAGE_TOKENIZER_MODEL", "tokenizer/tokenizer.model"))
 
 
+def configure_runtime_paths(model_config: str | None, checkpoint_dir: str | None, tokenizer_model: str | None) -> None:
+    """Configure runtime paths via environment variables."""
+    if model_config:
+        os.environ["SAGE_MODEL_CONFIG"] = model_config
+    if checkpoint_dir:
+        os.environ["SAGE_CHECKPOINT_DIR"] = checkpoint_dir
+    if tokenizer_model:
+        os.environ["SAGE_TOKENIZER_MODEL"] = tokenizer_model
+
+
 def get_model() -> SageTransformer:
     """Lazily create the model for server startup."""
     global _MODEL, _MODEL_DEVICE
@@ -190,9 +200,13 @@ def _health_action(_: dict[str, object]) -> dict[str, object]:
 
 
 def _generate_action(args: dict[str, object]) -> dict[str, object]:
+    input_ids_raw = args.get("input_ids", [])
+    if not isinstance(input_ids_raw, list):
+        input_ids_raw = [input_ids_raw] if input_ids_raw is not None else []
+    input_ids = [int(item) for item in input_ids_raw]  # type: ignore
     request = GenerationRequest(
-        input_ids=[int(item) for item in list(args.get("input_ids", []))],
-        max_new_tokens=int(args.get("max_new_tokens", 32)),
+        input_ids=input_ids,
+        max_new_tokens=int(args.get("max_new_tokens", 32)),  # type: ignore
     )
     return generate(request)
 

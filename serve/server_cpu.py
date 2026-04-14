@@ -7,10 +7,21 @@ import shutil
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from serve.control_plane import build_control_router
+from serve.control_plane import build_control_router, get_runtime_access_info
 
 
 app = FastAPI(title="SAGE CPU Server")
+
+
+def _print_startup_banner() -> None:
+    """Print the login details for the browser control UI."""
+    access = get_runtime_access_info()
+    local_url = (access["local_url"] or "http://127.0.0.1:8001").rstrip("/")
+    public_url = access["public_url"]
+    print(f"SAGE local URL: {local_url}/")
+    if public_url:
+        print(f"SAGE public URL: {public_url.rstrip('/')}/")
+    print(f"SAGE login password: {access['password']}")
 
 
 class ChatRequest(BaseModel):
@@ -51,3 +62,8 @@ def _health_action(_: dict[str, object]) -> dict[str, object]:
 
 
 app.include_router(build_control_router({"health_check": _health_action}))
+
+
+@app.on_event("startup")
+def _startup_banner() -> None:
+    _print_startup_banner()

@@ -3,12 +3,12 @@ import time
 
 from fastapi.testclient import TestClient
 
-from serve.control_plane import CONTROL_MANAGER, _quote_shell
+from serve.control_plane import CONTROL_MANAGER, _quote_shell, get_runtime_access_info
 from serve.server_cpu import app
 
 
 def _login(client: TestClient) -> None:
-    response = client.post("/api/login", json={"password": "test-password"})
+    response = client.post("/api/login", json={"password": get_runtime_access_info()["password"]})
     assert response.status_code == 200
 
 
@@ -26,21 +26,19 @@ def _wait_for_terminal_state(client: TestClient, job_id: str, timeout: float = 1
     raise AssertionError(f"Job {job_id} did not finish in time: {last_payload}")
 
 
-def test_control_plane_requires_auth(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+def test_control_plane_requires_auth() -> None:
     CONTROL_MANAGER.reset_for_tests()
     client = TestClient(app)
     response = client.get("/api/commands/presets")
     assert response.status_code == 401
 
 
-def test_login_and_html_index(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+def test_login_and_html_index() -> None:
     CONTROL_MANAGER.reset_for_tests()
     client = TestClient(app)
     response = client.get("/")
     assert response.status_code == 200
-    assert "SAGE Remote Control" in response.text
+    assert "SAGE IDE" in response.text
 
     bad = client.post("/api/login", json={"password": "wrong"})
     assert bad.status_code == 401
@@ -56,8 +54,7 @@ def test_login_and_html_index(monkeypatch) -> None:
     assert "git_status" in preset_ids
 
 
-def test_preset_job_launch_and_logs(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+def test_preset_job_launch_and_logs() -> None:
     CONTROL_MANAGER.reset_for_tests()
     client = TestClient(app)
     _login(client)
@@ -71,8 +68,7 @@ def test_preset_job_launch_and_logs(monkeypatch) -> None:
     assert any(line for line in detail["logs"])
 
 
-def test_raw_command_job_and_sse(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+def test_raw_command_job_and_sse() -> None:
     CONTROL_MANAGER.reset_for_tests()
     client = TestClient(app)
     _login(client)
@@ -92,8 +88,7 @@ def test_raw_command_job_and_sse(monkeypatch) -> None:
     assert detail["job"]["exit_code"] == 0
 
 
-def test_stop_long_running_job(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+def test_stop_long_running_job() -> None:
     CONTROL_MANAGER.reset_for_tests()
     client = TestClient(app)
     _login(client)
@@ -111,8 +106,7 @@ def test_stop_long_running_job(monkeypatch) -> None:
     assert detail["job"]["status"] == "stopped"
 
 
-def test_health_api_preset(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+def test_health_api_preset() -> None:
     CONTROL_MANAGER.reset_for_tests()
     client = TestClient(app)
     _login(client)
@@ -124,8 +118,7 @@ def test_health_api_preset(monkeypatch) -> None:
     assert payload["result"]["status"] == "ok"
 
 
-def test_required_preset_field_validation(monkeypatch) -> None:
-    monkeypatch.setenv("SAGE_WEB_PASSWORD", "test-password")
+def test_required_preset_field_validation() -> None:
     CONTROL_MANAGER.reset_for_tests()
     client = TestClient(app)
     _login(client)

@@ -112,17 +112,13 @@ python -m train.trainer \
 GPU/PyTorch server:
 
 ```bash
-$env:SAGE_WEB_PASSWORD="change-me"
-$env:SAGE_CHECKPOINT_DIR="runs/sage-1b"
-$env:SAGE_TOKENIZER_MODEL="tokenizer/tokenizer.model"
-python -m uvicorn serve.server:app --host 0.0.0.0 --port 8000
+python -m serve.start --host 0.0.0.0 --port 8000
 ```
 
 CPU control-plane server:
 
 ```bash
-$env:SAGE_WEB_PASSWORD="change-me"
-python -m uvicorn serve.server_cpu:app --host 0.0.0.0 --port 8001
+python -m serve.start --cpu --host 0.0.0.0 --port 8001
 ```
 
 Helper scripts:
@@ -142,7 +138,7 @@ http://127.0.0.1:8000/
 
 The browser UI now supports:
 
-- login with `SAGE_WEB_PASSWORD`
+- login with the random 12-character password printed in the terminal at server startup
 - dataset bootstrap preset
 - shard-building preset
 - tokenizer/train/eval/server presets

@@ -14,6 +14,7 @@ import secrets
 import shlex
 import shutil
 import signal
+import string
 import subprocess
 import sys
 import threading
@@ -30,6 +31,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STATIC_INDEX = REPO_ROOT / "serve" / "static" / "index.html"
 SESSION_COOKIE = "sage_session"
 SESSION_AGE_SECONDS = 60 * 60 * 12
+PASSWORD_LENGTH = 12
+_RUNTIME_PASSWORD: str | None = None
+_RUNTIME_LOCAL_URL: str | None = None
+_RUNTIME_PUBLIC_URL: str | None = None
 
 
 @dataclass(frozen=True)
@@ -451,7 +456,27 @@ CONTROL_MANAGER = CommandManager()
 
 
 def _get_password() -> str | None:
-    return os.environ.get("SAGE_WEB_PASSWORD")
+    global _RUNTIME_PASSWORD
+    if _RUNTIME_PASSWORD is None:
+        alphabet = string.ascii_letters + string.digits
+        _RUNTIME_PASSWORD = "".join(secrets.choice(alphabet) for _ in range(PASSWORD_LENGTH))
+    return _RUNTIME_PASSWORD
+
+
+def get_runtime_access_info() -> dict[str, str | None]:
+    """Return the current runtime login password and access URLs."""
+    return {
+        "password": _get_password(),
+        "local_url": _RUNTIME_LOCAL_URL,
+        "public_url": _RUNTIME_PUBLIC_URL,
+    }
+
+
+def set_runtime_access_urls(local_url: str | None = None, public_url: str | None = None) -> None:
+    """Record the URLs that should be shown in the startup banner."""
+    global _RUNTIME_LOCAL_URL, _RUNTIME_PUBLIC_URL
+    _RUNTIME_LOCAL_URL = local_url
+    _RUNTIME_PUBLIC_URL = public_url
 
 
 def _get_signing_secret() -> str:
@@ -653,8 +678,6 @@ def build_control_router(api_handlers: dict[str, Callable[[dict[str, Any]], dict
     @router.post("/api/login")
     def login(payload: LoginRequest, response: Response) -> dict[str, Any]:
         password = _get_password()
-        if not password:
-            raise HTTPException(status_code=503, detail="SAGE_WEB_PASSWORD is not configured.")
         if not hmac.compare_digest(payload.password, password):
             raise HTTPException(status_code=401, detail="Invalid password.")
         token = _encode_cookie_payload({"iat": time.time(), "nonce": secrets.token_hex(8)})
