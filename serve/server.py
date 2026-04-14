@@ -130,22 +130,30 @@ def _generate_token_ids(input_ids: list[int], max_new_tokens: int) -> list[int]:
     """Run greedy decoding from input token ids."""
     model = get_model()
     device = get_generation_device()
-    generated = list(input_ids)
-    tensor_ids = torch.tensor([input_ids], dtype=torch.long, device=device)
-    cache: Optional[list[tuple[torch.Tensor, torch.Tensor]]] = None
+    context_length = model.config.context_length
+    generated = list(input_ids[-context_length:])
     with torch.inference_mode():
         for _ in range(max(0, int(max_new_tokens))):
-            logits, cache = model(tensor_ids[:, -1:] if cache is not None else tensor_ids, past_key_values=cache)
+            window = generated[-context_length:]
+            tensor_ids = torch.tensor([window], dtype=torch.long, device=device)
+            logits, _ = model(tensor_ids)
             next_token = int(torch.argmax(logits[:, -1, :], dim=-1).item())
             generated.append(next_token)
-            tensor_ids = torch.tensor([[next_token]], dtype=torch.long, device=device)
     return generated
 
 
 def chat_status() -> dict[str, object]:
     """Return whether text chat is configured for the current server."""
     tokenizer = get_tokenizer()
+    checkpoint_dir = _MODEL_STATE["checkpoint_dir"] or str(_resolve_checkpoint_dir())
     checkpoint_loaded = bool(_MODEL_STATE["checkpoint_loaded"])
+    if not checkpoint_loaded:
+        checkpoint_loaded = any(Path(checkpoint_dir).glob("ckpt_step_*.pt"))
+    checkpoint_step = int(_MODEL_STATE["checkpoint_step"] or 0)
+    if checkpoint_step == 0 and checkpoint_loaded:
+        latest = sorted(Path(checkpoint_dir).glob("ckpt_step_*.pt"))
+        if latest:
+            checkpoint_step = int(latest[-1].stem.split("_")[-1])
     available = tokenizer is not None
     warning = None
     if tokenizer is None:
@@ -155,9 +163,9 @@ def chat_status() -> dict[str, object]:
     return {
         "available": available,
         "tokenizer_path": _MODEL_STATE["tokenizer_path"],
-        "checkpoint_dir": _MODEL_STATE["checkpoint_dir"],
+        "checkpoint_dir": checkpoint_dir,
         "checkpoint_loaded": checkpoint_loaded,
-        "checkpoint_step": _MODEL_STATE["checkpoint_step"],
+        "checkpoint_step": checkpoint_step,
         "warning": warning,
     }
 

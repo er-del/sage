@@ -1,0 +1,14 @@
+run_name: sage-tiny-local
+total_tokens: 5000000
+effective_batch_tokens: 8192
+peak_learning_rate: 3.0e-4
+min_learning_rate: 3.0e-5
+warmup_steps: 5
+weight_decay: 0.01
+betas: [0.9, 0.95]
+adam_eps: 1.0e-8
+gradient_clip_norm: 1.0
+checkpoint_interval: 10
+log_interval: 1
+eval_interval: 10
+seed: 42

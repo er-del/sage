@@ -1,4 +1,10 @@
-"""Upload the current SAGE repository contents to the Hugging Face Hub."""
+"""Upload SAGE model repository contents to the Hugging Face Hub.
+
+Only uploads files relevant to the model: source code, configs,
+tokenizer assets, documentation, and serving infrastructure.
+Debug scripts, test suites, IDE files, checkpoints, and build
+artifacts are excluded.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +14,28 @@ from huggingface_hub import HfApi
 
 
 REPO_ID = "sage002/sage"
-DEFAULT_COMMIT_MESSAGE = "feat: add authenticated remote control UI and ngrok launcher"
+DEFAULT_COMMIT_MESSAGE = "SAGE model repository :  Updating some model checkpoints "
+
+
+HF_IGNORE_PATTERNS = [
+    ".git/*",
+    ".gitignore",
+    ".idea/*",
+    ".pytest_cache/*",
+    ".venv/*",
+    "__pycache__/*",
+    "*.pyc",
+    "*.pyo",
+    "checkpoints/*",
+    "runs/*",
+    "wandb/*",
+    "logs/*",
+    "data/raw/*",
+    "data/processed/*",
+    "debug/*",
+    "tests/*",
+    "*.log",
+]
 
 
 def main() -> None:
@@ -20,15 +47,7 @@ def main() -> None:
         folder_path=".",
         repo_id=REPO_ID,
         repo_type="model",
-        ignore_patterns=[
-            ".git/*",
-            ".venv/*",
-            "__pycache__/*",
-            "*.pyc",
-            "checkpoints/*",
-            "runs/*",
-            "wandb/*",
-        ],
+        ignore_patterns=HF_IGNORE_PATTERNS,
         delete_patterns="*",
         commit_message=commit_message,
     )

@@ -41,31 +41,31 @@ pip install datasets huggingface_hub tqdm
 ### Basic — download everything
 
 ```bash
-python download_5b_tokens.py --output-dir data/raw
+python debug/download_5b_tokens.py --output-dir data/raw
 ```
 
 ### Test run — 1% of data to verify everything works
 
 ```bash
-python download_5b_tokens.py --output-dir data/raw --scale 0.01
+python debug/download_5b_tokens.py --output-dir data/raw --scale 0.01
 ```
 
 ### Resume — continue after an internet cutout
 
 ```bash
-python download_5b_tokens.py --output-dir data/raw --resume
+python debug/download_5b_tokens.py --output-dir data/raw --resume
 ```
 
 ### Download only one specific file
 
 ```bash
-python download_5b_tokens.py --output-dir data/raw --only code.jsonl
+python debug/download_5b_tokens.py --output-dir data/raw --only code.jsonl
 ```
 
 ### Download multiple specific files
 
 ```bash
-python download_5b_tokens.py --output-dir data/raw --only code.jsonl math_science.jsonl
+python debug/download_5b_tokens.py --output-dir data/raw --only code.jsonl math_science.jsonl
 ```
 
 ---
@@ -195,8 +195,8 @@ Token budget breakdown:
 
 Usage:
   pip install datasets huggingface_hub tqdm
-  python download_5b_tokens.py --output-dir data/raw
-  python download_5b_tokens.py --output-dir data/raw --resume
+  python debug/download_5b_tokens.py --output-dir data/raw
+  python debug/download_5b_tokens.py --output-dir data/raw --resume
 """
 
 import argparse

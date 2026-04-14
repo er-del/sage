@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 
 wandb/
-hf_push.py
 
 # C extensions
 *.so
@@ -125,6 +124,9 @@ ngrok.log
 *.ngrok.log
 not for your use/
 Sage_v1.0/
+
+# Debug scripts and utilities
+debug/
 
 # Large dataset and processed outputs
 data/raw/

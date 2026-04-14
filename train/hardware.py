@@ -78,7 +78,10 @@ class HardwareConfig:
     def _pick_grad_accum(self) -> int:
         target_tokens = 2_000_000
         tokens_per_micro = self.micro_batch * self.context_length * max(self.n_gpus, 1)
-        return max(1, target_tokens // max(tokens_per_micro, 1))
+        grad_accum = max(1, target_tokens // max(tokens_per_micro, 1))
+        if self.device == "cpu":
+            return min(8, grad_accum)
+        return grad_accum
 
     def summary(self) -> dict[str, object]:
         """Return a JSON-safe hardware summary."""

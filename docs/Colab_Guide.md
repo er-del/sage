@@ -15,7 +15,7 @@ To train a model, you need text. We recently added a 5-Billion-Token downloader,
 1. In the SAGE IDE, open the **CLI Terminal** (click the `>_` icon on the left sidebar, or press `Ctrl + \``).
 2. Type the following command and press Enter to download a small 1% slice (~50 Million tokens):
    ```bash
-   python download_5b_tokens.py --output-dir data/raw --scale 0.01
+   python debug/download_5b_tokens.py --output-dir data/raw --scale 0.01
    ```
 3. Watch the terminal. It will take a few minutes to download the General Web, Code, Math, Wikipedia, and Synthetic datasets into `data/raw/`.
 
