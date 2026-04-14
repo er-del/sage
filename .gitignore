@@ -125,3 +125,9 @@ ngrok.log
 *.ngrok.log
 not for your use/
 Sage_v1.0/
+
+# Large dataset and processed outputs
+data/raw/
+data/processed/
+# Tokenizer corpus used only for local training
+tokenizer/training_corpus.txt
