@@ -6,14 +6,14 @@ Automatically downloads ~5B tokens from free, public Hugging Face datasets and s
 
 ## Token Budget
 
-| File                 | Source                                            | Tokens           |
-| -------------------- | ------------------------------------------------- | ---------------- |
-| `general_web.jsonl`  | FineWeb                                           | 2.5B             |
-| `code.jsonl`         | The Stack v2 (Python, JS, Rust, Go, C++ and more) | 1.0B             |
-| `math_science.jsonl` | OpenWebMath                                       | 0.5B             |
-| `multilingual.jsonl` | Wikipedia (20+ languages)                         | 0.5B             |
-| `synthetic.jsonl`    | OpenHermes 2.5 (instruction data)                 | 0.5B             |
-| **Total**            |                                                   | **~5.0B tokens** |
+| File | Source | Tokens |
+|---|---|---|
+| `general_web.jsonl` | FineWeb | 2.5B |
+| `code.jsonl` | The Stack v2 (Python, JS, Rust, Go, C++ and more) | 1.0B |
+| `math_science.jsonl` | OpenWebMath | 0.5B |
+| `multilingual.jsonl` | Wikipedia (20+ languages) | 0.5B |
+| `synthetic.jsonl` | OpenHermes 2.5 (instruction data) | 0.5B |
+| **Total** | | **~5.0B tokens** |
 
 **Estimated disk space:** ~20–25 GB  
 **Estimated download time:** 2–8 hours depending on your connection  
@@ -24,7 +24,6 @@ Automatically downloads ~5B tokens from free, public Hugging Face datasets and s
 ## Requirements
 
 ### System
-
 - Python 3.9+
 - 25 GB free disk space
 - Stable internet connection
@@ -73,12 +72,12 @@ python download_5b_tokens.py --output-dir data/raw --only code.jsonl math_scienc
 
 ## All Flags
 
-| Flag           | Default    | Description                                                    |
-| -------------- | ---------- | -------------------------------------------------------------- |
-| `--output-dir` | `data/raw` | Directory where JSONL files are saved                          |
-| `--resume`     | off        | Skip files that already hit their token target                 |
-| `--only`       | all files  | Download only the specified file(s)                            |
-| `--scale`      | `1.0`      | Scale all token targets (e.g. `0.1` = 10% of 5B = 500M tokens) |
+| Flag | Default | Description |
+|---|---|---|
+| `--output-dir` | `data/raw` | Directory where JSONL files are saved |
+| `--resume` | off | Skip files that already hit their token target |
+| `--only` | all files | Download only the specified file(s) |
+| `--scale` | `1.0` | Scale all token targets (e.g. `0.1` = 10% of 5B = 500M tokens) |
 
 ---
 
@@ -95,31 +94,26 @@ Every record written to disk follows this structure with at minimum a `text` fie
 ## Data Sources
 
 ### 1. FineWeb — `general_web.jsonl`
-
 - **Dataset:** `HuggingFaceFW/fineweb` (sample-10BT subset)
 - **What it is:** A pre-shuffled, deduplicated 10B-token slice of web-crawl text, one of the cleanest freely available web datasets
 - **Why it's used:** Broad general language coverage, essential for fluent text generation
 
 ### 2. The Stack v2 — `code.jsonl`
-
 - **Dataset:** `bigcode/the-stack-v2-train-smol-ids`
 - **What it is:** Source code across 10 programming languages: Python, JavaScript, TypeScript, Rust, Go, C++, Java, Bash, SQL, and HTML
 - **Why it's used:** Teaches the model programming syntax, logic, and structure
 
 ### 3. OpenWebMath — `math_science.jsonl`
-
 - **Dataset:** `open-web-math/open-web-math`
 - **What it is:** 14.7B tokens of mathematical content extracted from the web, including LaTeX, proofs, and problem sets
 - **Why it's used:** Improves numerical reasoning and scientific language understanding
 
 ### 4. Wikipedia — `multilingual.jsonl`
-
 - **Dataset:** `wikimedia/wikipedia` (20231101 dumps)
 - **Languages:** English, Spanish, French, German, Chinese, Japanese, Portuguese, Arabic, Russian, Hindi, Italian, Korean, Dutch, Polish, Swedish, Turkish, Vietnamese, Indonesian, Ukrainian, Persian
 - **Why it's used:** Clean, factual, encyclopedic text across 20 languages
 
 ### 5. OpenHermes 2.5 — `synthetic.jsonl`
-
 - **Dataset:** `teknium/OpenHermes-2.5`
 - **What it is:** ~1M high-quality instruction-following pairs formatted as `### Instruction` / `### Response` conversations
 - **Why it's used:** Teaches the model to follow instructions and produce structured, helpful responses

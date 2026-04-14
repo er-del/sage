@@ -707,7 +707,7 @@
     <div class="login-card">
       <h1>🧠 SAGE</h1>
       <p>LLM Control Interface — Enter your password to continue</p>
-      <input type="password" id="login-password" placeholder="Startup password shown in terminal" autocomplete="current-password">
+      <input type="password" id="login-password" placeholder="SAGE_WEB_PASSWORD" autocomplete="current-password">
       <button class="btn-login" id="login-btn">Authenticate</button>
       <div class="login-error" id="login-error"></div>
     </div>
@@ -1196,18 +1196,10 @@ const API = {
 
   streamJob(jobId, onLog, onStatus, onError) {
     const baseUrl = Config.get('apiUrl') || '';
-    this.closeStream(jobId);
     const es = new EventSource(baseUrl + '/api/jobs/' + jobId + '/stream');
     es.addEventListener('log', (e) => { const d = JSON.parse(e.data); onLog(d.line); });
-    es.addEventListener('status', (e) => {
-      const d = JSON.parse(e.data);
-      onStatus(d);
-      if (['completed', 'failed', 'stopped'].includes(d.status)) this.closeStream(jobId);
-    });
-    es.onerror = () => {
-      onError();
-      this.closeStream(jobId);
-    };
+    es.addEventListener('status', (e) => { const d = JSON.parse(e.data); onStatus(d); });
+    es.onerror = () => { onError(); };
     this._streams[jobId] = es;
     return es;
   },
@@ -1645,27 +1637,15 @@ const CLI = {
   },
 
   _streamJobLogs(jobId) {
-    if (this._activeJobId) API.closeStream(this._activeJobId);
     if (this._activeStream) this._activeStream.close();
     this._activeJobId = jobId;
     this._activeStream = API.streamJob(jobId,
       (line) => this._addOutput(line),
       (status) => {
         this._addOutput(`[status] ${JSON.stringify(status)}`, 'var(--warning)');
-        if (['completed', 'failed', 'stopped'].includes(status.status)) {
-          API.closeStream(jobId);
-          this._activeStream = null;
-          if (this._activeJobId === jobId) this._activeJobId = null;
-        }
         AppState.refreshJobs();
       },
-      () => {
-        this._addOutput('[stream disconnected]', 'var(--text-muted)');
-        if (this._activeJobId === jobId) {
-          this._activeStream = null;
-          this._activeJobId = null;
-        }
-      }
+      () => this._addOutput('[stream disconnected]', 'var(--text-muted)')
     );
   },
 
@@ -2402,11 +2382,6 @@ const Events = {
 
     // File attach btn (placeholder)
     document.getElementById('btn-attach').onclick = () => Toast.show('File upload: drag & drop files into the chat area', 'info');
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) AppState._clearPollingTimer();
-      else AppState._updateJobPolling();
-    });
   }
 };
 
@@ -2416,8 +2391,6 @@ const AppState = {
   chatWarning: '',
   jobs: [],
   pollTimer: null,
-  refreshPromise: null,
-  pollDelayMs: 5000,
 
   async bootstrap() {
     try {
@@ -2432,46 +2405,21 @@ const AppState = {
 
       await this.refreshJobs();
       await this.loadChatStatus();
+
+      if (!this.pollTimer) {
+        this.pollTimer = setInterval(() => this.refreshJobs().catch(() => {}), 5000);
+      }
     } catch (e) {
       Toast.show('Bootstrap error: ' + e.message, 'error');
     }
   },
 
   async refreshJobs() {
-    if (this.refreshPromise) return this.refreshPromise;
-    this.refreshPromise = (async () => {
-      try {
-        const data = await API.getJobs();
-        this.jobs = data.jobs || [];
-        UI.renderJobList();
-        this._updateJobPolling();
-      } catch {}
-      finally {
-        this.refreshPromise = null;
-      }
-    })();
-    return this.refreshPromise;
-  },
-
-  _clearPollingTimer() {
-    if (this.pollTimer) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
-    }
-  },
-
-  _scheduleNextPoll() {
-    this._clearPollingTimer();
-    this.pollTimer = setTimeout(() => {
-      this.pollTimer = null;
-      this.refreshJobs().catch(() => {});
-    }, this.pollDelayMs);
-  },
-
-  _updateJobPolling() {
-    const hasActiveJobs = this.jobs.some(job => ['running', 'stopping'].includes(job.status));
-    if (hasActiveJobs && !document.hidden) this._scheduleNextPoll();
-    else this._clearPollingTimer();
+    try {
+      const data = await API.getJobs();
+      this.jobs = data.jobs || [];
+      UI.renderJobList();
+    } catch {}
   },
 
   async loadChatStatus() {
