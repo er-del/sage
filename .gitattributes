@@ -38,9 +38,6 @@ logs/*
 *.swo
 *~
 
-# Documentation (keep README.md but ignore other docs)
-SAGE_KAGGLE_GUIDE.md
-SAGE_V3_ROADMAP.md
 
 # Distribution
 build/*

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 
 from fastapi import FastAPI
@@ -11,6 +12,7 @@ from serve.control_plane import build_control_router, get_runtime_access_info
 
 
 app = FastAPI(title="SAGE CPU Server")
+_LOGGER = logging.getLogger("uvicorn.error")
 
 
 def _print_startup_banner() -> None:
@@ -18,10 +20,10 @@ def _print_startup_banner() -> None:
     access = get_runtime_access_info()
     local_url = (access["local_url"] or "http://127.0.0.1:8001").rstrip("/")
     public_url = access["public_url"]
-    print(f"SAGE local URL: {local_url}/")
+    _LOGGER.info("SAGE local URL: %s/", local_url)
     if public_url:
-        print(f"SAGE public URL: {public_url.rstrip('/')}/")
-    print(f"SAGE login password: {access['password']}")
+        _LOGGER.info("SAGE public URL: %s/", public_url.rstrip("/"))
+    _LOGGER.info("SAGE login password: %s", access["password"])
 
 
 class ChatRequest(BaseModel):

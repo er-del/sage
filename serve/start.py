@@ -24,10 +24,10 @@ def _start_public_tunnel(port: int, auth_token: str | None = None) -> str:
 
     if auth_token:
         ngrok.set_auth_token(auth_token)
-    tunnel = ngrok.connect(addr=port, proto="http", bind_tls=True)
+    tunnel = ngrok.connect(addr=port, proto="http", bind_tls=True) # type: ignore
 
     def _close_tunnel() -> None:
-        ngrok.disconnect(tunnel.public_url)
+        ngrok.disconnect(tunnel.public_url) # type: ignore
 
     atexit.register(_close_tunnel)
     return str(tunnel.public_url)

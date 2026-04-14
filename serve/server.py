@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -12,7 +13,7 @@ from pydantic import BaseModel
 
 from model.config import ModelConfig
 from model.model import SageTransformer
-from serve.control_plane import build_control_router
+from serve.control_plane import build_control_router, get_runtime_access_info
 from train.checkpoint import load_latest_checkpoint
 from train.hardware import HardwareConfig
 
@@ -28,6 +29,18 @@ _MODEL_STATE: dict[str, Any] = {
     "checkpoint_step": 0,
     "tokenizer_path": None,
 }
+_LOGGER = logging.getLogger("uvicorn.error")
+
+
+def _print_startup_banner() -> None:
+    """Print the login details for the browser control UI."""
+    access = get_runtime_access_info()
+    local_url = (access["local_url"] or "http://127.0.0.1:8000").rstrip("/")
+    public_url = access["public_url"]
+    _LOGGER.info("SAGE local URL: %s/", local_url)
+    if public_url:
+        _LOGGER.info("SAGE public URL: %s/", public_url.rstrip("/"))
+    _LOGGER.info("SAGE login password: %s", access["password"])
 
 
 class GenerationRequest(BaseModel):
@@ -212,3 +225,8 @@ def _generate_action(args: dict[str, object]) -> dict[str, object]:
 
 
 app.include_router(build_control_router({"health_check": _health_action, "generate": _generate_action}))
+
+
+@app.on_event("startup")
+def _startup_banner() -> None:
+    _print_startup_banner()
