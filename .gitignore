@@ -125,11 +125,23 @@ ngrok.log
 not for your use/
 Sage_v1.0/
 
+# IDE and editors
+.idea/
+.vscode/
+
 # Debug scripts and utilities
 debug/
 
 # Large dataset and processed outputs
 data/raw/
 data/processed/
+
+# Training runs and checkpoints
+runs/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
 # Tokenizer corpus used only for local training
 tokenizer/training_corpus.txt

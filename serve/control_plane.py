@@ -458,8 +458,12 @@ CONTROL_MANAGER = CommandManager()
 def _get_password() -> str | None:
     global _RUNTIME_PASSWORD
     if _RUNTIME_PASSWORD is None:
-        alphabet = string.ascii_letters + string.digits
-        _RUNTIME_PASSWORD = "".join(secrets.choice(alphabet) for _ in range(PASSWORD_LENGTH))
+        env_password = os.environ.get("SAGE_WEB_PASSWORD")
+        if env_password:
+            _RUNTIME_PASSWORD = env_password
+        else:
+            alphabet = string.ascii_letters + string.digits
+            _RUNTIME_PASSWORD = "".join(secrets.choice(alphabet) for _ in range(PASSWORD_LENGTH))
     return _RUNTIME_PASSWORD
 
 
